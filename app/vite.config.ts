@@ -15,6 +15,13 @@ const ROOTS: Record<string, string> = {
   english: path.resolve(here, '../english'),
 }
 
+// Fail loudly in CI if the study folder isn't there (e.g. deployed without the repo root).
+if (process.env.VERCEL && !fs.existsSync(ROOTS.english)) {
+  throw new Error(
+    `Study files not found at ${ROOTS.english}. In Vercel → Settings → Build and Deployment, set Root Directory to the repository root (empty), or enable "Include files outside the root directory".`,
+  )
+}
+
 const MIME: Record<string, string> = {
   '.pdf': 'application/pdf',
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
