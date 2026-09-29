@@ -90,7 +90,7 @@ export function ExamPanel() {
                     {i.resourceId && (
                       <Link
                         to={`/learn/${i.resourceId}`}
-                        className="flex shrink-0 items-center gap-1 rounded-md border border-[#2a2a2a] bg-[#161616] px-2.5 py-1 text-[12px] font-medium text-fg-2 transition-colors hover:border-accent/40 hover:text-fg"
+                        className="btn btn-secondary flex shrink-0 items-center gap-1 border border-[#2a2a2a] bg-[#161616] px-2.5 py-1 text-[12px] font-medium text-fg-2"
                         aria-label={`Go to ${i.label}`}
                       >
                         Go <ArrowRight size={12} />

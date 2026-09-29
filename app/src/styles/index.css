@@ -54,9 +54,14 @@
   from { opacity: 0; transform: scale(0.98) translateY(-4px); }
   to { opacity: 1; transform: none; }
 }
-@keyframes pixel-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
+@keyframes route-bar {
+  0% { transform: scaleX(0); opacity: 1; }
+  60% { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(10px); filter: blur(3px); }
+  to { opacity: 1; transform: none; filter: none; }
 }
 @keyframes shimmer {
   from { background-position: -200% 0; }
@@ -220,30 +225,43 @@
   .font-pixel {
     font-weight: 700;
   }
-  /* Buttons: a fill sweeps in from the left; trailing icons nudge forward; press sinks */
+  /* Buttons: a solid fill swipes across from the left on hover; text flips to match */
   .btn {
     position: relative;
     isolation: isolate;
     overflow: hidden;
-    --wipe: var(--color-ink-3);
+    --wipe: var(--color-accent);
+    --wipe-fg: #000;
+    transition:
+      color 240ms var(--ease-out),
+      border-color 240ms var(--ease-out),
+      transform 160ms var(--ease-out);
   }
   .btn::before {
     content: '';
     position: absolute;
-    inset: 0;
+    inset: -1px;
     z-index: -1;
     background: var(--wipe);
-    transform: translateX(-101%);
-    transition: transform 280ms var(--ease-out);
+    transform: scaleX(0);
+    transform-origin: right center;
+    transition: transform 320ms cubic-bezier(0.7, 0, 0.2, 1);
   }
-  .btn:hover::before {
-    transform: translateX(0);
+  .btn:hover::before,
+  .btn:focus-visible::before {
+    transform: scaleX(1);
+    transform-origin: left center;
+  }
+  .btn:hover,
+  .btn:focus-visible {
+    color: var(--wipe-fg);
+    border-color: var(--wipe);
   }
   .btn svg {
-    transition: transform 220ms var(--ease-out);
+    transition: transform 240ms var(--ease-out);
   }
   .btn:hover svg:first-child {
-    transform: scale(1.12);
+    transform: translateX(-1px) scale(1.1);
   }
   .btn:hover svg:last-child:not(:first-child) {
     transform: translateX(3px);
@@ -255,10 +273,44 @@
     --wipe: #ffffff;
   }
   .btn-secondary {
-    --wipe: #1f1f1f;
+    --wipe: var(--color-accent);
   }
   .btn-ghost {
-    --wipe: var(--color-ink-3);
+    --wipe: var(--color-fg);
+  }
+
+  /* Sidebar / nav links: a quieter swipe */
+  .sweep {
+    position: relative;
+    isolation: isolate;
+  }
+  .sweep::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--color-ink-3);
+    transform: scaleX(0);
+    transform-origin: right center;
+    transition: transform 260ms cubic-bezier(0.7, 0, 0.2, 1);
+  }
+  .sweep:hover::before {
+    transform: scaleX(1);
+    transform-origin: left center;
+  }
+
+  /* Route change: a thin accent bar sweeps across the top */
+  .route-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    z-index: 60;
+    background: var(--color-accent);
+    transform-origin: left center;
+    animation: route-bar 620ms cubic-bezier(0.7, 0, 0.2, 1) both;
+    pointer-events: none;
   }
 
   /* Rows / list items: a yellow bar grows on the left edge */
@@ -281,17 +333,15 @@
     transform: scaleY(1);
   }
 
-  /* Page sections rise in one after another */
+  /* Page sections ease in one after another */
   .stagger > * {
-    animation: rise 420ms var(--ease-out) both;
+    animation: page-in 480ms var(--ease-out) both;
   }
-  .stagger > *:nth-child(1) { animation-delay: 40ms; }
-  .stagger > *:nth-child(2) { animation-delay: 90ms; }
-  .stagger > *:nth-child(3) { animation-delay: 140ms; }
-  .stagger > *:nth-child(4) { animation-delay: 190ms; }
-  .stagger > *:nth-child(5) { animation-delay: 240ms; }
-  .stagger > *:nth-child(6) { animation-delay: 290ms; }
-  .stagger > *:nth-child(n + 7) { animation-delay: 330ms; }
+  .stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger > *:nth-child(2) { animation-delay: 60ms; }
+  .stagger > *:nth-child(3) { animation-delay: 120ms; }
+  .stagger > *:nth-child(4) { animation-delay: 170ms; }
+  .stagger > *:nth-child(n + 5) { animation-delay: 210ms; }
 
   /* Checkbox tick pops */
   [role='checkbox'][aria-checked='true'] svg {
@@ -311,8 +361,12 @@
 
 @media (prefers-reduced-motion: reduce) {
   .btn::before,
+  .sweep::before,
   .row-bar::after {
     transition: none;
+  }
+  .route-bar {
+    display: none;
   }
   .stagger > * {
     animation: none;

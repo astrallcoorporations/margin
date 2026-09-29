@@ -11,7 +11,7 @@ import { AskDialog } from '@/components/AskDialog'
 import { ShortcutsDialog } from '@/components/ShortcutsDialog'
 import { ReviseDialog } from '@/components/ReviseDialog'
 import { UIContext } from './ui-context'
-import { PixelField, PixelWipe } from '@/components/Pixels'
+import { PixelField } from '@/components/Pixels'
 
 const sectionNav = [
   { to: '/', label: 'Overview', icon: LayoutGrid, end: true },
@@ -120,10 +120,8 @@ export function AppShell() {
         )}
 
         <main id="main" className="relative min-w-0 flex-1 lg:border-l lg:border-line" tabIndex={-1}>
-          <div className="pointer-events-none fixed inset-x-0 top-[104px] bottom-0 z-20 lg:left-[268px]">
-            <PixelWipe />
-          </div>
-          <div key={location.pathname} className="animate-rise">
+          <div key={location.pathname}>
+            <div className="route-bar" aria-hidden="true" />
             <Outlet />
           </div>
         </main>
@@ -246,8 +244,8 @@ function SidebarNav() {
   const location = useLocation()
   const sectionClass = ({ isActive }: { isActive: boolean }) =>
     cn(
-      'group flex h-[30px] items-center gap-2.5 px-2.5 text-[13.5px] transition-colors duration-150',
-      isActive ? 'bg-accent font-medium text-black' : 'text-fg-2 hover:bg-ink-2 hover:text-fg',
+      'group flex h-[30px] items-center gap-2.5 px-2.5 text-[13.5px] transition-colors duration-200',
+      isActive ? 'bg-accent font-medium text-black' : 'sweep text-fg-2 hover:text-fg',
     )
   return (
     <nav className="flex h-full flex-col overflow-y-auto px-4 pt-6 pb-4" aria-label="English">
@@ -282,8 +280,8 @@ function SidebarNav() {
                     to={`/learn/${r.id}`}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'block px-2.5 py-[6px] text-[13px] leading-snug transition-colors duration-150',
-                      active ? 'bg-accent font-medium text-black' : 'text-fg-3 hover:bg-ink-2 hover:text-fg-2',
+                      'block px-2.5 py-[6px] text-[13px] leading-snug transition-colors duration-200',
+                      active ? 'bg-accent font-medium text-black' : 'sweep text-fg-3 hover:text-fg',
                     )}
                   >
                     {r.title}

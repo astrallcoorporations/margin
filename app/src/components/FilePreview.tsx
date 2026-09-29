@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Download, ExternalLink, FileWarning, Presentation, RefreshCw } from 'lucide-react'
 import { docxToHtml, fileExists, fileName, fileUrl, kindOf } from '@/lib/files'
 import { Button, buttonClass } from './ui'
+import { VideoPlayer } from './VideoPlayer'
 
 type Load = { state: 'loading' } | { state: 'ready'; content: string } | { state: 'error'; message: string }
 
@@ -13,36 +14,6 @@ export function FilePreview({ path, cloudUrl, height = '72vh' }: { path: string;
   if (kind === 'video') return <VideoPlayer path={path} />
   if (kind === 'docx' || kind === 'text' || kind === 'markdown') return <TextDoc path={path} />
   return <NoPreview path={path} cloudUrl={cloudUrl} />
-}
-
-function VideoPlayer({ path }: { path: string }) {
-  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
-  useEffect(() => setState('loading'), [path])
-  return (
-    <div className="relative overflow-hidden border border-line bg-black">
-      {state === 'loading' && <div className="skeleton absolute inset-0 !rounded-none" aria-hidden="true" />}
-      {state === 'error' ? (
-        <div className="flex aspect-video flex-col items-center justify-center gap-3 p-6 text-center">
-          <FileWarning size={18} className="text-warn" />
-          <p className="text-[13px] text-fg-2">This video couldn’t play here.</p>
-          <a className={buttonClass('secondary', 'sm')} href={fileUrl(path, true)}>
-            <Download size={13} /> Download it instead
-          </a>
-        </div>
-      ) : (
-        <video
-          key={path}
-          src={fileUrl(path)}
-          controls
-          preload="metadata"
-          playsInline
-          onLoadedMetadata={() => setState('ready')}
-          onError={() => setState('error')}
-          className="relative block aspect-video w-full bg-black"
-        />
-      )}
-    </div>
-  )
 }
 
 function PdfFrame({ path, height }: { path: string; height: string }) {

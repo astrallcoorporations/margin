@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
 
 const reduced = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -71,34 +70,6 @@ export function PixelField() {
       <canvas ref={crisp} className="absolute inset-0 h-full w-full opacity-80 [image-rendering:pixelated]" />
       {/* keep the reading area calm */}
       <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_0%,rgba(10,10,10,0.35)_40%,rgba(10,10,10,0.9)_80%)]" />
-    </div>
-  )
-}
-
-/** Route transition: a grid of squares that dissolves in random order when the page changes. */
-export function PixelWipe() {
-  const { pathname } = useLocation()
-  const cells = useMemo(() => {
-    const out: { delay: number; hot: boolean }[] = []
-    for (let i = 0; i < 12 * 8; i++) out.push({ delay: Math.random() * 260, hot: Math.random() > 0.94 })
-    return out
-    // New random order on every navigation.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname])
-  const first = useRef(true)
-  useEffect(() => {
-    first.current = false
-  }, [])
-  if (first.current || reduced()) return null
-  return (
-    <div key={pathname} className="pointer-events-none absolute inset-0 z-10 grid grid-cols-12 grid-rows-8 overflow-hidden" aria-hidden="true">
-      {cells.map((c, i) => (
-        <span
-          key={i}
-          className={c.hot ? 'bg-accent' : 'bg-ink-0'}
-          style={{ animation: `pixel-out 220ms steps(3, end) ${c.delay}ms both` }}
-        />
-      ))}
     </div>
   )
 }
