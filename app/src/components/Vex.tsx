@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, Copy, ExternalLink, LogIn, LogOut, Plus, RotateCcw, Send, Square, X } from 'lucide-react'
-import { askVex, fetchLibrary, signInUrl, signOut, startSync, vexSession, VexError, VEX_SITE, type LibraryData, type VexCredits, type VexMessage, type VexSession } from '@/lib/vex'
+import { ChevronDown, Copy, ExternalLink, LogIn, LogOut, Paperclip, Plus, RotateCcw, Send, Square, X } from 'lucide-react'
+import { ATTACH_ACCEPT, MAX_ATTACH, askVex, fetchLibrary, readAttachment, signInUrl, signOut, startSync, vexSession, VexError, VEX_SITE, type Attachment, type LibraryData, type VexCredits, type VexMessage, type VexSession } from '@/lib/vex'
 import { renderMarkdown } from '@/lib/md'
 import { copyText } from '@/lib/clipboard'
 import { buttonClass } from './ui'
@@ -11,7 +11,7 @@ import { useToast } from './toast'
 import { VexTrailer } from './VexTrailer'
 
 type Item =
-  | { role: 'user'; content: string; label?: string }
+  | { role: 'user'; content: string; label?: string; images?: string[]; files?: string[] }
   | { role: 'assistant'; content: string; error?: { text: string; kind: VexError['kind'] }; charged?: number }
 
 type Ask = (getText: () => string | Promise<string>, label: string) => void
@@ -49,6 +49,37 @@ export function VexProvider({ children }: { children: ReactNode }) {
   const [credits, setCredits] = useState<VexCredits | null>(null)
   const [model, setModel] = useState('')
   const [draft, setDraft] = useState('')
+  const [modelId, setModelId] = useState(() => {
+    try {
+      return localStorage.getItem('vex-model') || ''
+    } catch {
+      return ''
+    }
+  })
+  const [attach, setAttach] = useState<Attachment[]>([])
+  const [reading, setReading] = useState(false)
+  const [coolUntil, setCoolUntil] = useState(0)
+  const [now, setNow] = useState(() => Date.now())
+  const filePick = useRef<HTMLInputElement>(null)
+  const models = session.state === 'signedin' ? session.models : []
+  const picked = models.find((m) => m.id === modelId) ?? models[0]
+  const coolLeft = Math.max(0, Math.ceil((coolUntil - now) / 1000))
+  useEffect(() => {
+    if (coolUntil <= Date.now()) return
+    const t = window.setInterval(() => {
+      setNow(Date.now())
+      if (Date.now() >= coolUntil) window.clearInterval(t)
+    }, 500)
+    return () => window.clearInterval(t)
+  }, [coolUntil])
+  const chooseModel = (id: string) => {
+    setModelId(id)
+    try {
+      localStorage.setItem('vex-model', id)
+    } catch {
+      /* private mode: the choice just isn't remembered */
+    }
+  }
   const ctl = useRef<AbortController | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLTextAreaElement>(null)
@@ -130,12 +161,22 @@ export function VexProvider({ children }: { children: ReactNode }) {
       ctl.current = mine
       setItems([...history, { role: 'assistant', content: '' }])
       setBusy(true)
-      const wire: VexMessage[] = history.filter((m) => m.content).map((m) => ({ role: m.role, content: m.content }))
+      // Only the newest message carries its photos; older ones are described in words (Vex's server does the same).
+      const lastUser = history.map((m) => m.role).lastIndexOf('user')
+      const wire: VexMessage[] = history.flatMap((m, i): VexMessage[] => {
+        if (!m.content) return []
+        if (m.role === 'user' && m.images?.length && i === lastUser)
+          return [{ role: 'user', content: [{ type: 'text', text: m.content }, ...m.images.map((url) => ({ type: 'image_url' as const, image_url: { url } }))] }]
+        return [{ role: m.role, content: m.content }]
+      })
+      setCoolUntil(Date.now() + Math.max(2, (picked?.cost ?? 1) * 2) * 1000)
+      setNow(Date.now())
       try {
         const r = await askVex(
           wire,
           { text: (piece) => patchLast((a) => ({ ...a, content: a.content + piece })), meta: (m) => m.model && setModel(m.model) },
           mine.signal,
+          picked?.id,
         )
         if (r.credits) setCredits(r.credits)
         patchLast((a) => (a.content ? { ...a, charged: r.charged } : { ...a, error: { text: 'No answer came back.', kind: 'server' } }))
@@ -143,18 +184,20 @@ export function VexProvider({ children }: { children: ReactNode }) {
         if (mine.signal.aborted) return
         const err = e instanceof VexError ? { text: e.message, kind: e.kind } : { text: 'Something went wrong talking to Vex.', kind: 'server' as const }
         if (err.kind === 'signin') refresh()
+        if (e instanceof VexError && e.wait) setCoolUntil(Date.now() + e.wait * 1000)
         patchLast((a) => ({ ...a, error: err }))
       } finally {
         if (ctl.current === mine) setBusy(false)
       }
     },
-    [refresh],
+    [refresh, picked],
   )
 
   const ask = useCallback<Ask>(
     async (getText, label) => {
       setOpen(true)
       if (!signedIn) return // the panel explains: sign in first
+      if (coolUntil > Date.now()) return notify(`Give Vex a moment: ${Math.ceil((coolUntil - Date.now()) / 1000)}s`, 'error')
       try {
         const text = (await getText()).trim()
         if (!text) return notify('Nothing to send yet', 'error')
@@ -169,14 +212,37 @@ export function VexProvider({ children }: { children: ReactNode }) {
         notify(e instanceof Error ? e.message : 'Couldn’t build the prompt', 'error')
       }
     },
-    [notify, run, signedIn],
+    [notify, run, signedIn, coolUntil],
   )
 
+  const addFiles = async (list: FileList | null) => {
+    const files = Array.from(list ?? [])
+    if (!files.length) return
+    if (attach.length + files.length > MAX_ATTACH) return notify(`Attach up to ${MAX_ATTACH} files at a time.`, 'error')
+    setReading(true)
+    for (const f of files) {
+      try {
+        const a = await readAttachment(f)
+        setAttach((cur) => (cur.some((x) => x.id === a.id) ? cur : [...cur, a]))
+      } catch (e) {
+        notify(e instanceof Error ? e.message : `Couldn’t read “${f.name}”.`, 'error')
+      }
+    }
+    setReading(false)
+    if (filePick.current) filePick.current.value = ''
+  }
+
   const followUp = () => {
-    const text = draft.trim()
-    if (!text || busy || !signedIn) return
+    const typed = draft.trim()
+    if ((!typed && !attach.length) || busy || !signedIn || reading) return
+    if (coolUntil > Date.now()) return notify(`Give Vex a moment: ${Math.ceil((coolUntil - Date.now()) / 1000)}s`, 'error')
+    const images = attach.filter((a) => a.kind === 'image' && a.url).map((a) => a.url as string)
+    const docs = attach.filter((a) => a.kind === 'text')
+    const text = [typed || (images.length && !docs.length ? 'What is in this?' : 'Help me with the attached file.'), ...docs.map((a) => `Attached file “${a.name}”:\n${a.text}`)].join('\n\n')
+    if (text.length > MAX_PROMPT) return notify(`That is ${Math.round(text.length / 1000)}k characters, too long for the free Groq plan (limit ${MAX_PROMPT / 1000}k). Attach less.`, 'error')
     setDraft('')
-    run([...items.filter((m) => !(m.role === 'assistant' && m.error)), { role: 'user', content: text }])
+    setAttach([])
+    run([...items.filter((m) => !(m.role === 'assistant' && m.error)), { role: 'user', content: text, images: images.length ? images : undefined, files: attach.map((a) => a.name) }])
   }
   const retry = () => run(items.slice(0, -1))
   const stop = () => {
@@ -187,6 +253,7 @@ export function VexProvider({ children }: { children: ReactNode }) {
     stop()
     setItems([])
     setDraft('')
+    setAttach([])
   }
   const leave = useCallback(async () => {
     stop()
@@ -281,10 +348,58 @@ export function VexProvider({ children }: { children: ReactNode }) {
                     )}
                   </div>
                   <footer className="shrink-0 border-t border-line p-3">
+                    {models.length > 0 && (
+                      <div className="mb-2 flex items-center gap-2">
+                        <label htmlFor="vex-model" className="sr-only">
+                          Model
+                        </label>
+                        <div className="relative min-w-0 flex-1">
+                          <select
+                            id="vex-model"
+                            value={picked?.id ?? ''}
+                            onChange={(e) => chooseModel(e.target.value)}
+                            disabled={busy}
+                            className="w-full min-w-0 appearance-none truncate border border-line-2 bg-ink-2 py-1.5 pr-8 pl-2.5 font-mono text-[11.5px] text-fg focus:border-accent/50 focus:outline-none disabled:opacity-60"
+                          >
+                            {models.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.name} · {m.cost} {m.cost === 1 ? 'credit' : 'credits'}
+                                {m.vision ? ' · photos' : ''}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown size={13} className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-fg-3" />
+                        </div>
+                        {picked?.what && <span className="hidden truncate text-[11.5px] text-fg-3 sm:block">{picked.what}</span>}
+                      </div>
+                    )}
+                    {attach.length > 0 && (
+                      <div className="mb-2 flex flex-wrap gap-2">
+                        {attach.map((a) => (
+                          <span key={a.id} className="inline-flex max-w-full items-center gap-1.5 border border-line-2 bg-ink-2 py-1 pr-1 pl-2 text-[12px] text-fg-2">
+                            {a.kind === 'image' && a.url && <img src={a.url} alt="" className="size-5 object-cover" />}
+                            <span className="truncate">{a.name}</span>
+                            <button onClick={() => setAttach((cur) => cur.filter((x) => x.id !== a.id))} className="grid size-5 place-items-center text-fg-3 hover:text-fg" aria-label={`Remove ${a.name}`}>
+                              <X size={12} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <input ref={filePick} type="file" accept={ATTACH_ACCEPT} multiple className="hidden" onChange={(e) => addFiles(e.target.files)} />
                     <div className="flex items-end gap-2 border border-line-2 bg-ink-2 p-2 transition-colors focus-within:border-accent/50">
                       <label htmlFor="vex-input" className="sr-only">
                         Message Vex
                       </label>
+                      <button
+                        onClick={() => filePick.current?.click()}
+                        disabled={busy || reading || attach.length >= MAX_ATTACH}
+                        className="grid size-9 shrink-0 place-items-center text-fg-3 hover:text-fg disabled:opacity-40"
+                        aria-label="Attach a photo, PDF, Word, PowerPoint or text file"
+                        title="Attach a file"
+                      >
+                        <Paperclip size={16} />
+                      </button>
                       <textarea
                         id="vex-input"
                         ref={input}
@@ -305,8 +420,8 @@ export function VexProvider({ children }: { children: ReactNode }) {
                           <Square size={12} /> Stop
                         </Button>
                       ) : (
-                        <Button variant="primary" onClick={followUp} disabled={!draft.trim()}>
-                          <Send size={13} /> Send
+                        <Button variant="primary" onClick={followUp} disabled={(!draft.trim() && !attach.length) || reading || coolLeft > 0}>
+                          <Send size={13} /> {coolLeft > 0 ? `${coolLeft}s` : reading ? 'Reading' : 'Send'}
                         </Button>
                       )}
                     </div>
@@ -447,7 +562,19 @@ function Sent({ item }: { item: Extract<Item, { role: 'user' }> }) {
     return (
       <div>
         <div className="mb-1 font-pixel text-[10.5px] tracking-[0.08em] text-fg-3 uppercase">You</div>
-        <p className="text-[14.5px] leading-relaxed whitespace-pre-wrap text-fg">{item.content}</p>
+        <p className="text-[14.5px] leading-relaxed whitespace-pre-wrap text-fg">{item.files?.length ? item.content.split('\n\nAttached file “')[0] : item.content}</p>
+        {(item.images?.length || item.files?.length) && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {item.images?.map((u, i) => (
+              <img key={i} src={u} alt="Attached photo" className="h-20 border border-line-2 object-cover" />
+            ))}
+            {item.files?.filter((n) => !/\.(png|jpe?g|webp|gif|heic)$/i.test(n)).map((n) => (
+              <span key={n} className="inline-flex items-center gap-1.5 border border-line-2 bg-ink-2 px-2 py-1 text-[12px] text-fg-2">
+                <Paperclip size={11} /> {n}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     )
   }

@@ -13,7 +13,9 @@ export const VEX_URL: string = (import.meta.env.VITE_VEX_URL as string | undefin
 /** Where Vex's own standalone page lives, for the "Open Vex" links. */
 export const VEX_SITE: string = (import.meta.env.VITE_VEX_SITE as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:3000'
 
-export type VexMessage = { role: 'user' | 'assistant'; content: string }
+export type VexPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
+export type VexMessage = { role: 'user' | 'assistant'; content: string | VexPart[] }
+export type VexModel = { id: string; name: string; short?: string; what?: string; cost: number; vision?: boolean }
 export type VexCredits = { left: number; max: number }
 
 export type Attached = { id: string; title: string }
@@ -34,7 +36,7 @@ export type VexSession =
   | { state: 'loading' }
   | { state: 'offline' }
   | { state: 'signedout'; unavailable: boolean }
-  | { state: 'signedin'; email: string; credits: VexCredits; model: string; hasKey: boolean; open: boolean }
+  | { state: 'signedin'; email: string; credits: VexCredits; model: string; models: VexModel[]; hasKey: boolean; open: boolean }
 
 const call = (path: string, init: RequestInit = {}) => fetch(`${VEX_URL}${path}`, { ...init, credentials: 'include' })
 
@@ -52,7 +54,7 @@ export async function vexSession(): Promise<VexSession> {
     }
     if (!r.ok) return { state: 'offline' }
     const j = await r.json()
-    return { state: 'signedin', email: j.email || j.name || '', credits: j.credits, model: j.models?.[0]?.name ?? 'Vex', hasKey: Boolean(j.hasKey), open: Boolean(j.open) }
+    return { state: 'signedin', email: j.email || j.name || '', credits: j.credits, model: j.models?.[0]?.name ?? 'Vex', models: (j.models ?? []) as VexModel[], hasKey: Boolean(j.hasKey), open: Boolean(j.open) }
   } catch {
     return { state: 'offline' }
   }
@@ -78,6 +80,7 @@ export class VexError extends Error {
   constructor(
     message: string,
     public kind: 'offline' | 'signin' | 'server',
+    public wait = 0,
   ) {
     super(message)
   }
@@ -90,10 +93,11 @@ export async function askVex(
   messages: VexMessage[],
   on: { text: (piece: string) => void; meta?: (m: { model?: string; sample?: boolean }) => void },
   signal?: AbortSignal,
+  model?: string,
 ): Promise<{ charged: number; credits?: VexCredits }> {
   let res: Response
   try {
-    res = await call('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'plain', messages: messages.slice(-12) }), signal })
+    res = await call('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'plain', model, messages: messages.slice(-12) }), signal })
   } catch (e) {
     if (signal?.aborted) throw e
     throw new VexError('Vex isn’t running. Start it, then try again.', 'offline')
@@ -101,13 +105,15 @@ export async function askVex(
   if (res.status === 401) throw new VexError('Sign in with Google to use Vex.', 'signin')
   if (!res.ok || !res.body) {
     let msg = `Vex didn’t answer (${res.status}).`
+    let wait = 0
     try {
       const j = await res.json()
       if (j.error) msg = j.error
+      if (typeof j.wait === 'number') wait = j.wait
     } catch {
       /* not JSON — keep the default */
     }
-    throw new VexError(msg, 'server')
+    throw new VexError(msg, 'server', wait)
   }
 
   const reader = res.body.getReader()
@@ -215,6 +221,56 @@ export async function openLibFile(f: LibFile, download = false): Promise<void> {
   }
 }
 
+/* ---------------- attaching files to a message ---------------- */
+export type Attachment = { id: string; name: string; kind: 'image' | 'text'; text?: string; url?: string }
+const TEXT_EXT = /\.(txt|md|csv|json|js|ts|tsx|jsx|py|html|css|java|c|cpp|cs|go|rs|rb|php|sql|xml|yml|yaml|log)$/i
+export const ATTACH_ACCEPT = 'image/*,.pdf,.docx,.pptx,.txt,.md,.csv,.json,.js,.ts,.py,.html,.css,.java,.c,.cpp,.sql,.xml,.yml'
+export const MAX_ATTACH = 3
+// (PDF reading itself is done on Vex's server)
+
+function shrinkImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      const scale = Math.min(1, 1000 / Math.max(img.width, img.height))
+      const c = document.createElement('canvas')
+      c.width = Math.max(1, Math.round(img.width * scale))
+      c.height = Math.max(1, Math.round(img.height * scale))
+      c.getContext('2d')?.drawImage(img, 0, 0, c.width, c.height)
+      URL.revokeObjectURL(url)
+      resolve(c.toDataURL('image/jpeg', 0.75))
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new VexError(`“${file.name}” isn’t an image Vex can open.`, 'server'))
+    }
+    img.src = url
+  })
+}
+
+/** Turns a picked file into something Vex can read: a shrunken photo, or its words. Throws a VexError with a plain reason. */
+export async function readAttachment(file: File): Promise<Attachment> {
+  const id = `${file.name}-${file.size}-${file.lastModified}`
+  if (file.type.startsWith('image/')) return { id, name: file.name, kind: 'image', url: await shrinkImage(file) }
+  if (/\.(docx|pptx|pdf)$/i.test(file.name)) {
+    if (file.size > 6 * 1024 * 1024) throw new VexError(`“${file.name}” is over 6 MB.`, 'server')
+    const buf = new Uint8Array(await file.arrayBuffer())
+    let bin = ''
+    for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000))
+    const r = await call('/api/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: file.name, data: btoa(bin) }) })
+    const j: { text?: string; readable?: boolean; error?: string } = await r.json().catch(() => ({}))
+    if (!r.ok) throw new VexError(j.error || `Couldn’t read “${file.name}”.`, 'server')
+    if (!j.readable || !j.text?.trim()) throw new VexError(`“${file.name}” has no text Vex can read.`, 'server')
+    return { id, name: file.name, kind: 'text', text: j.text }
+  }
+  if (TEXT_EXT.test(file.name) || file.type.startsWith('text/')) {
+    if (file.size > 400 * 1024) throw new VexError(`“${file.name}” is too big (400 KB limit for text files).`, 'server')
+    return { id, name: file.name, kind: 'text', text: (await file.text()).slice(0, 20000) }
+  }
+  throw new VexError(`Vex can’t read “${file.name}”. Try a photo, PDF, Word, PowerPoint or text file.`, 'server')
+}
+
 /** The words inside the files a teacher attached to a post (Word, PowerPoint, Google Docs/Slides/Sheets, text), read live through Vex. */
 export async function attachedText(files: Attached[] = []): Promise<string> {
   const parts = await Promise.all(
@@ -223,7 +279,7 @@ export async function attachedText(files: Attached[] = []): Promise<string> {
         const r = await call(`/api/classroom/file-text?id=${encodeURIComponent(f.id)}`)
         if (!r.ok) return `Attached file “${f.title}”: couldn’t be opened.`
         const j: { text: string; readable: boolean; truncated?: boolean } = await r.json()
-        if (!j.readable || !j.text.trim()) return `Attached file “${f.title}”: its contents can’t be read here (PDFs and images aren’t read yet).`
+        if (!j.readable || !j.text.trim()) return `Attached file “${f.title}”: its words can’t be read here (it may be a scan or an image).`
         return `Attached file “${f.title}”${j.truncated ? ' (start of it)' : ''}:\n${j.text.slice(0, 8000)}`
       } catch {
         return `Attached file “${f.title}”: couldn’t be opened.`
