@@ -222,7 +222,7 @@ export async function openLibFile(f: LibFile, download = false): Promise<void> {
 }
 
 /* ---------------- attaching files to a message ---------------- */
-export type Attachment = { id: string; name: string; kind: 'image' | 'text'; text?: string; url?: string }
+export type Attachment = { id: string; name: string; kind: 'image' | 'text'; text?: string; url?: string; images?: string[] }
 const TEXT_EXT = /\.(txt|md|csv|json|js|ts|tsx|jsx|py|html|css|java|c|cpp|cs|go|rs|rb|php|sql|xml|yml|yaml|log)$/i
 export const ATTACH_ACCEPT = 'image/*,.pdf,.docx,.pptx,.txt,.md,.csv,.json,.js,.ts,.py,.html,.css,.java,.c,.cpp,.sql,.xml,.yml'
 export const MAX_ATTACH = 3
@@ -259,8 +259,9 @@ export async function readAttachment(file: File): Promise<Attachment> {
     let bin = ''
     for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000))
     const r = await call('/api/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: file.name, data: btoa(bin) }) })
-    const j: { text?: string; readable?: boolean; error?: string } = await r.json().catch(() => ({}))
+    const j: { text?: string; readable?: boolean; error?: string; images?: string[] } = await r.json().catch(() => ({}))
     if (!r.ok) throw new VexError(j.error || `Couldn’t read “${file.name}”.`, 'server')
+    if (j.images?.length) return { id, name: file.name, kind: 'text', text: `(“${file.name}” is a scan; its first ${j.images.length} page${j.images.length === 1 ? ' is' : 's are'} attached as photos.)`, images: j.images }
     if (!j.readable || !j.text?.trim()) throw new VexError(`“${file.name}” has no text Vex can read.`, 'server')
     return { id, name: file.name, kind: 'text', text: j.text }
   }
@@ -272,13 +273,25 @@ export async function readAttachment(file: File): Promise<Attachment> {
 }
 
 /** The words inside the files a teacher attached to a post (Word, PowerPoint, Google Docs/Slides/Sheets, text), read live through Vex. */
+let attachedImages: string[] = []
+/** Page photos of scanned files found by the last attachedText call. Taken once by the panel and sent along as photos. */
+export const takeAttachedImages = () => {
+  const out = attachedImages
+  attachedImages = []
+  return out
+}
 export async function attachedText(files: Attached[] = []): Promise<string> {
+  attachedImages = []
   const parts = await Promise.all(
     files.slice(0, 4).map(async (f) => {
       try {
         const r = await call(`/api/classroom/file-text?id=${encodeURIComponent(f.id)}`)
         if (!r.ok) return `Attached file “${f.title}”: couldn’t be opened.`
-        const j: { text: string; readable: boolean; truncated?: boolean } = await r.json()
+        const j: { text: string; readable: boolean; truncated?: boolean; images?: string[] } = await r.json()
+        if (j.images?.length) {
+          attachedImages.push(...j.images)
+          return `Attached file “${f.title}”: it is a scan, so its first ${j.images.length} page${j.images.length === 1 ? ' is' : 's are'} attached as photos. Read them and use them.`
+        }
         if (!j.readable || !j.text.trim()) return `Attached file “${f.title}”: its words can’t be read here (it may be a scan or an image).`
         return `Attached file “${f.title}”${j.truncated ? ' (start of it)' : ''}:\n${j.text.slice(0, 8000)}`
       } catch {

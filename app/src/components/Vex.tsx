@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Copy, ExternalLink, LogIn, LogOut, Paperclip, Plus, RotateCcw, Send, Square, X } from 'lucide-react'
-import { ATTACH_ACCEPT, MAX_ATTACH, askVex, fetchLibrary, readAttachment, signInUrl, signOut, startSync, vexSession, VexError, VEX_SITE, type Attachment, type LibraryData, type VexCredits, type VexMessage, type VexSession } from '@/lib/vex'
+import { ATTACH_ACCEPT, MAX_ATTACH, askVex, fetchLibrary, readAttachment, takeAttachedImages, signInUrl, signOut, startSync, vexSession, VexError, VEX_SITE, type Attachment, type LibraryData, type VexCredits, type VexMessage, type VexSession } from '@/lib/vex'
 import { renderMarkdown } from '@/lib/md'
 import { copyText } from '@/lib/clipboard'
 import { buttonClass } from './ui'
@@ -200,6 +200,7 @@ export function VexProvider({ children }: { children: ReactNode }) {
       if (coolUntil > Date.now()) return notify(`Give Vex a moment: ${Math.ceil((coolUntil - Date.now()) / 1000)}s`, 'error')
       try {
         const text = (await getText()).trim()
+        const scans = takeAttachedImages().slice(0, 4)
         if (!text) return notify('Nothing to send yet', 'error')
         // Groq's free plan allows only a few thousand tokens a minute. A prompt bigger than this would be refused or cut off.
         if (text.length > MAX_PROMPT) {
@@ -207,7 +208,7 @@ export function VexProvider({ children }: { children: ReactNode }) {
           return notify(`That prompt is ${Math.round(text.length / 1000)}k characters, too long for Vex on the free Groq plan (limit ${MAX_PROMPT / 1000}k). Choose less, or use Copy and paste it into another AI.`, 'error')
         }
         // A new Margin prompt starts a fresh conversation: each one carries its own full context.
-        run([{ role: 'user', content: text, label }])
+        run([{ role: 'user', content: text, label, images: scans.length ? scans : undefined }])
       } catch (e) {
         notify(e instanceof Error ? e.message : 'Couldn’t build the prompt', 'error')
       }
@@ -236,7 +237,7 @@ export function VexProvider({ children }: { children: ReactNode }) {
     const typed = draft.trim()
     if ((!typed && !attach.length) || busy || !signedIn || reading) return
     if (coolUntil > Date.now()) return notify(`Give Vex a moment: ${Math.ceil((coolUntil - Date.now()) / 1000)}s`, 'error')
-    const images = attach.filter((a) => a.kind === 'image' && a.url).map((a) => a.url as string)
+    const images = attach.flatMap((a) => (a.kind === 'image' && a.url ? [a.url] : (a.images ?? []))).slice(0, 4)
     const docs = attach.filter((a) => a.kind === 'text')
     const text = [typed || (images.length && !docs.length ? 'What is in this?' : 'Help me with the attached file.'), ...docs.map((a) => `Attached file “${a.name}”:\n${a.text}`)].join('\n\n')
     if (text.length > MAX_PROMPT) return notify(`That is ${Math.round(text.length / 1000)}k characters, too long for the free Groq plan (limit ${MAX_PROMPT / 1000}k). Attach less.`, 'error')
