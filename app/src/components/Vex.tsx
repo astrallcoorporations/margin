@@ -1,13 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Copy, ExternalLink, LogIn, LogOut, Plus, RotateCcw, Send, Square, X } from 'lucide-react'
-import { askVex, captureToken, fetchLibrary, signInUrl, signOut, startSync, vexSession, VexError, VEX_URL, type LibraryData, type VexCredits, type VexMessage, type VexSession } from '@/lib/vex'
+import { askVex, fetchLibrary, signInUrl, signOut, startSync, vexSession, VexError, VEX_SITE, type LibraryData, type VexCredits, type VexMessage, type VexSession } from '@/lib/vex'
 import { renderMarkdown } from '@/lib/md'
 import { copyText } from '@/lib/clipboard'
 import { buttonClass } from './ui'
 import { cn } from '@/lib/utils'
 import { Button } from './ui'
 import { useToast } from './toast'
+import { VexTrailer } from './VexTrailer'
 
 type Item =
   | { role: 'user'; content: string; label?: string }
@@ -70,7 +71,6 @@ export function VexProvider({ children }: { children: ReactNode }) {
 
   // On first load: pick up a fresh sign-in, show why a sign-in or Classroom connect didn't work, then ask Vex who we are.
   useEffect(() => {
-    captureToken()
     const q = new URLSearchParams(window.location.search)
     const why = q.get('signin')
     const cls = q.get('classroom')
@@ -331,7 +331,7 @@ function Locked({ session, onRetry }: { session: VexSession; onRetry: () => void
         <>
           <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-fg">Vex isn’t running</h2>
           <p className="max-w-sm text-[13.5px] leading-relaxed text-fg-2">
-            Open the <span className="font-mono">nova</span> folder and run <span className="font-mono">node server.js</span>. Margin looks for it at <span className="font-mono">{VEX_URL}</span>.
+            Open the <span className="font-mono">nova</span> folder and run <span className="font-mono">node server.js</span>. Margin reaches it at <span className="font-mono">{VEX_SITE}</span>.
           </p>
           <Button onClick={onRetry}>
             <RotateCcw size={13} /> Check again
@@ -344,6 +344,7 @@ function Locked({ session, onRetry }: { session: VexSession; onRetry: () => void
         </>
       ) : session.state === 'signedout' ? (
         <>
+          <VexTrailer />
           <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-fg">Sign in to use Vex</h2>
           <p className="max-w-sm text-[13.5px] leading-relaxed text-fg-2">
             The AI and Classroom unlock once you sign in with Google. Only <span className="font-mono">ked.edu.in</span> school accounts and a short approved list can sign in.
@@ -387,7 +388,7 @@ export function VexAccount() {
           </p>
           <p className="mt-0.5 font-mono text-[11.5px] text-fg-3 tabular-nums">{session.credits.left} credits left today</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <a href={VEX_URL} target="_blank" rel="noreferrer" className={buttonClass('secondary', 'sm')}>
+            <a href={VEX_SITE} target="_blank" rel="noreferrer" className={buttonClass('secondary', 'sm')}>
               <ExternalLink size={12} /> Open Vex
             </a>
             {!session.open && (
@@ -484,7 +485,7 @@ function Answer({ item, live, onRetry, onCopyPrompt }: { item: Extract<Item, { r
           <p className="text-[13.5px] leading-relaxed text-fg">{item.error.text}</p>
           {item.error.kind === 'offline' && (
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-fg-2">
-              Open the <span className="font-mono">nova</span> folder and run <span className="font-mono">node server.js</span>. Vex is expected at <span className="font-mono">{VEX_URL}</span>.
+              Open the <span className="font-mono">nova</span> folder and run <span className="font-mono">node server.js</span>. Vex is expected at <span className="font-mono">{VEX_SITE}</span>.
             </p>
           )}
           {item.error.kind === 'signin' && (

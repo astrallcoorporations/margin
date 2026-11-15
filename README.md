@@ -14,7 +14,7 @@ Margin can send its prompts to **Vex**, your own AI server (the `nova` folder ne
 
 - Easiest: double-click `Open Margin.bat`. It starts Vex and Margin together.
 - Or run `node server.js` in the `nova` folder, then Margin as usual.
-- Margin looks for Vex at `http://localhost:3000`. Change it with `VITE_VEX_URL` in `app/.env` (see `app/.env.example`).
+- Margin and Vex are **one website**: Margin forwards `/api` and `/auth` to Vex (default `http://localhost:3000`, change with `VEX_TARGET` in `app/.env`). There is no separate sign-in page to remember and no token in any address.
 - The sidebar has **Sign up / Sign in**. Until you sign in with Google, the AI and Classroom are locked. Only ked.edu.in school accounts and a short approved list can sign in.
 - Once signed in: **Ask Vex** buttons on Ask AI, task review, tests, topic pages, flashcards and Revise; and a **Classroom** page with what is due and the class stream.
 - Prompts longer than about 24,000 characters are refused for Vex (Groq's free plan is small). Use Copy for those.

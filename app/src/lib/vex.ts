@@ -1,13 +1,17 @@
 /**
- * Vex — the owner's own AI server (the "nova" project). Margin builds prompts and asks Vex to answer them,
- * and reads Google Classroom through Vex. Vex holds the Google keys and the saved sign-ins; Margin holds none.
+ * Vex: the AI server (the "nova" project) that sits behind Margin. Margin and Vex are ONE website: Margin calls Vex on its own
+ * address ("/api/..." and "/auth/..."), and the dev server (or a Vercel rewrite) forwards those to Vex. So there is no
+ * cross-site call, no token in a URL, and the sign-in lives in an ordinary cookie that Vex sets.
  *
- * Sign-in is Google only (a school address or an approved one). After Google, Vex sends the browser back here
- * with a session token in the URL fragment; it is kept in this browser and sent with every request.
+ * Vex holds the Google keys and the saved sign-ins; Margin holds none. Sign-in is Google only (a school address or an
+ * approved one).
+ *
+ * A separate Vex site (vex.vercel.app) can come later; this same API is what it serves.
  */
-export const VEX_URL: string = (import.meta.env.VITE_VEX_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:3000'
-
-const TOKEN_KEY = 'margin.vexToken'
+/** Where Margin's own requests go. Empty means "this same site", which is the normal setup. */
+export const VEX_URL: string = (import.meta.env.VITE_VEX_URL as string | undefined)?.replace(/\/$/, '') ?? ''
+/** Where Vex's own standalone page lives, for the "Open Vex" links. */
+export const VEX_SITE: string = (import.meta.env.VITE_VEX_SITE as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:3000'
 
 export type VexMessage = { role: 'user' | 'assistant'; content: string }
 export type VexCredits = { left: number; max: number }
@@ -31,37 +35,12 @@ export type VexSession =
   | { state: 'signedout'; unavailable: boolean }
   | { state: 'signedin'; email: string; credits: VexCredits; model: string; hasKey: boolean; open: boolean }
 
-/** Pick up the session Vex hands back after Google sign-in, and tidy the address bar. */
-export function captureToken() {
-  const m = /[#&]vexToken=([^&]+)/.exec(window.location.hash)
-  if (!m) return
-  try {
-    localStorage.setItem(TOKEN_KEY, decodeURIComponent(m[1]))
-  } catch {
-    /* storage blocked: sign-in will not stick */
-  }
-  window.history.replaceState(null, '', window.location.pathname + window.location.search)
-}
-export const forgetToken = () => {
-  try {
-    localStorage.removeItem(TOKEN_KEY)
-  } catch {
-    /* nothing to forget */
-  }
-}
-function headers(extra?: Record<string, string>): Record<string, string> {
-  let t: string | null = null
-  try {
-    t = localStorage.getItem(TOKEN_KEY)
-  } catch {
-    /* no storage */
-  }
-  return { ...(t ? { Authorization: `Bearer ${t}` } : {}), ...extra }
-}
-const call = (path: string, init: RequestInit = {}) => fetch(`${VEX_URL}${path}`, { ...init, credentials: 'include', headers: headers(init.headers as Record<string, string>) })
+const call = (path: string, init: RequestInit = {}) => fetch(`${VEX_URL}${path}`, { ...init, credentials: 'include' })
 
-export const signInUrl = (back: string = window.location.href) => `${VEX_URL}/auth/google/signin?return=${encodeURIComponent(back)}`
-export const connectClassroomUrl = (back: string = window.location.href) => `${VEX_URL}/auth/google?return=${encodeURIComponent(back)}`
+/** After Google, Vex sends the person back to this exact page. Vex only accepts a path on its own site or an exact allowed origin. */
+const here = () => window.location.href
+export const signInUrl = (back: string = here()) => `${VEX_URL}/auth/google/signin?return=${encodeURIComponent(back)}`
+export const connectClassroomUrl = (back: string = here()) => `${VEX_URL}/auth/google?return=${encodeURIComponent(back)}`
 
 export async function vexSession(): Promise<VexSession> {
   try {
@@ -84,7 +63,6 @@ export async function signOut() {
   } catch {
     /* server gone: forgetting the token is enough */
   }
-  forgetToken()
 }
 
 export async function fetchClassroom(fresh = false): Promise<ClassroomData> {

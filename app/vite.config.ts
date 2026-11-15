@@ -179,8 +179,16 @@ function localFiles(): Plugin {
   }
 }
 
+/**
+ * Margin and Vex are one website. Margin asks for "/api/..." and "/auth/..." on its own address and these rules forward
+ * them to Vex, so the browser never talks to two sites and the sign-in cookie just works.
+ */
+const VEX_TARGET = process.env.VEX_TARGET ?? 'http://localhost:3000'
+const vexProxy = { '/api': { target: VEX_TARGET, changeOrigin: false }, '/auth': { target: VEX_TARGET, changeOrigin: false } }
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), localFiles(), corpus()],
   resolve: { alias: { '@': path.resolve(here, 'src') } },
-  server: { port: 5173 },
+  server: { port: 5173, proxy: vexProxy },
+  preview: { proxy: vexProxy },
 })

@@ -8,7 +8,7 @@ import { Page, PageHeader } from '@/components/blocks'
 import { useToast } from '@/components/toast'
 import { Button, buttonClass, Section } from '@/components/ui'
 import { useVex } from '@/components/Vex'
-import { signInUrl, VEX_URL } from '@/lib/vex'
+import { signInUrl, VEX_SITE } from '@/lib/vex'
 import { useUI } from '@/app/ui-context'
 
 export default function Settings() {
@@ -118,7 +118,7 @@ export default function Settings() {
             {session.state === 'loading' && 'Checking…'}
           </dd>
           <dt className="text-fg-3">Address</dt>
-          <dd className="font-mono text-[12px] break-all text-fg">{VEX_URL}</dd>
+          <dd className="font-mono text-[12px] break-all text-fg">{VEX_SITE}</dd>
           {session.state === 'signedin' && (
             <>
               <dt className="text-fg-3">Signed in as</dt>
@@ -146,7 +146,7 @@ export default function Settings() {
           </Button>
         </div>
         <p className="mt-3 max-w-lg text-[12.5px] leading-relaxed text-fg-3">
-          Margin asks Vex to answer prompts and to read Google Classroom. Only ked.edu.in school accounts and a short approved list can sign in. To point Margin at a different Vex, set <span className="font-mono">VITE_VEX_URL</span> in <span className="font-mono">app/.env</span>.
+          Margin asks Vex to answer prompts and to read Google Classroom. Only ked.edu.in school accounts and a short approved list can sign in. Margin and Vex are one website: Margin forwards <span className="font-mono">/api</span> and <span className="font-mono">/auth</span> to Vex. To point at a different Vex, set <span className="font-mono">VEX_TARGET</span> in <span className="font-mono">app/.env</span>.
         </p>
       </Section>
 
