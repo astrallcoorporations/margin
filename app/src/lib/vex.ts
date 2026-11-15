@@ -16,8 +16,9 @@ export const VEX_SITE: string = (import.meta.env.VITE_VEX_SITE as string | undef
 export type VexMessage = { role: 'user' | 'assistant'; content: string }
 export type VexCredits = { left: number; max: number }
 
-export type ClassroomItem = { id: string; code: string; course: string; title: string; detail: string; n: string; unit: string; hot: boolean; link: string; text: string; c: string }
-export type StreamPost = { id: string; kind: 'announcement' | 'assignment' | 'material'; course: string; title: string; text: string; at: number; link: string; full: string }
+export type Attached = { id: string; title: string }
+export type ClassroomItem = { id: string; code: string; course: string; title: string; detail: string; n: string; unit: string; hot: boolean; link: string; text: string; c: string; files?: Attached[] }
+export type StreamPost = { id: string; kind: 'announcement' | 'assignment' | 'material'; course: string; title: string; text: string; at: number; link: string; full: string; files?: Attached[] }
 export type ClassroomData = {
   configured: boolean
   connected: boolean
@@ -212,6 +213,24 @@ export async function openLibFile(f: LibFile, download = false): Promise<void> {
     win?.close()
     throw e
   }
+}
+
+/** The words inside the files a teacher attached to a post (Word, PowerPoint, Google Docs/Slides/Sheets, text), read live through Vex. */
+export async function attachedText(files: Attached[] = []): Promise<string> {
+  const parts = await Promise.all(
+    files.slice(0, 4).map(async (f) => {
+      try {
+        const r = await call(`/api/classroom/file-text?id=${encodeURIComponent(f.id)}`)
+        if (!r.ok) return `Attached file “${f.title}”: couldn’t be opened.`
+        const j: { text: string; readable: boolean; truncated?: boolean } = await r.json()
+        if (!j.readable || !j.text.trim()) return `Attached file “${f.title}”: its contents can’t be read here (PDFs and images aren’t read yet).`
+        return `Attached file “${f.title}”${j.truncated ? ' (start of it)' : ''}:\n${j.text.slice(0, 8000)}`
+      } catch {
+        return `Attached file “${f.title}”: couldn’t be opened.`
+      }
+    })
+  )
+  return parts.join('\n\n')
 }
 
 export async function fetchFileText(id: string): Promise<{ text: string; readable: boolean; truncated?: boolean }> {

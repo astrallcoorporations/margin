@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ExternalLink, LogIn, RefreshCw } from 'lucide-react'
-import { connectClassroomUrl, fetchClassroom, signInUrl, VexError, type ClassroomData, type ClassroomItem, type StreamPost } from '@/lib/vex'
+import { attachedText, connectClassroomUrl, fetchClassroom, signInUrl, VexError, type Attached, type ClassroomData, type ClassroomItem, type StreamPost } from '@/lib/vex'
 import { timeAgo } from '@/lib/utils'
 import { Page, PageHeader } from '@/components/blocks'
 import { useVex, VexButton } from '@/components/Vex'
@@ -8,10 +8,15 @@ import { Button, buttonClass, Code, Empty } from '@/components/ui'
 
 const KIND: Record<StreamPost['kind'], string> = { announcement: 'Announcement', assignment: 'New assignment', material: 'Material' }
 
+const withFiles = async (base: string, files?: Attached[]) => {
+  if (!files?.length) return base
+  const extra = await attachedText(files)
+  return extra ? `${base}\n\n${extra}` : base
+}
 const workPrompt = (w: ClassroomItem) =>
-  `I’m a Class 8 student. Help me with this assignment from Google Classroom. Explain it step by step so I understand it.\n\n${w.text}`
+  withFiles(`I’m a Class 8 student. Help me with this assignment from Google Classroom. Explain it step by step so I understand it.\n\n${w.text}`, w.files)
 const postPrompt = (p: StreamPost) =>
-  `I’m a Class 8 student. Here is a post from my teacher on Google Classroom. Tell me what it means and what I need to do.\n\nCourse: ${p.course}\n${KIND[p.kind]}: ${p.title}\n\n${p.full || p.text}`
+  withFiles(`I’m a Class 8 student. Here is a post from my teacher on Google Classroom. Tell me what it means and what I need to do.\n\nCourse: ${p.course}\n${KIND[p.kind]}: ${p.title}\n\n${p.full || p.text}`, p.files)
 
 /** Due work and the class stream, read from Google Classroom through Vex. Read-only. */
 export default function Classroom() {
