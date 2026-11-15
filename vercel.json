@@ -3,5 +3,9 @@
   "installCommand": "if [ -d app ]; then cd app; fi && npm install",
   "buildCommand": "if [ -d app ]; then cd app; fi && npm run build",
   "outputDirectory": "app/dist",
-  "rewrites": [{ "source": "/((?!files/|assets/).*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://vex2026.vercel.app/api/:path*" },
+    { "source": "/auth/:path*", "destination": "https://vex2026.vercel.app/auth/:path*" },
+    { "source": "/((?!files/|assets/).*)", "destination": "/index.html" }
+  ]
 }
