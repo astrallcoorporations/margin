@@ -12,6 +12,7 @@ import { Breadcrumbs, Page } from '@/components/blocks'
 import { PassageCard, marksLabel } from '@/components/TestBits'
 import { CopyButton } from '@/components/CopyButton'
 import { AiLinks } from '@/components/AiLinks'
+import { VexButton } from '@/components/Vex'
 import { ButtonLink, Pill } from '@/components/ui'
 import NotFound from './NotFound'
 
@@ -89,9 +90,14 @@ export default function TestResult() {
                 The estimate only checks key points, format, length and spelling. Copy the whole paper — questions, your answers and the marking scheme — into any AI and it’ll mark it like a teacher.
               </p>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <CopyButton variant="primary" getText={() => buildMarkingPrompt(test, attempt.answers, result)} icon={<Sparkles size={14} />} toast="Marking prompt copied — paste it into your AI">
-                  Copy for AI marking
-                </CopyButton>
+                <div className="flex flex-wrap items-center gap-2">
+                  <VexButton label={`Mark my paper: ${test.title}`} getText={() => buildMarkingPrompt(test, attempt.answers, result)}>
+                    Mark with Vex
+                  </VexButton>
+                  <CopyButton getText={() => buildMarkingPrompt(test, attempt.answers, result)} icon={<Sparkles size={14} />} toast="Marking prompt copied — paste it into your AI">
+                    Copy for AI marking
+                  </CopyButton>
+                </div>
                 <AiLinks />
               </div>
             </div>

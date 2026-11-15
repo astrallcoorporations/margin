@@ -22,6 +22,7 @@ import type { FileRef, Resource } from '@/types'
 import { Breadcrumbs, Page, ResourceRow, Toc } from '@/components/blocks'
 import { FilePreview } from '@/components/FilePreview'
 import { CopyButton } from '@/components/CopyButton'
+import { VexButton } from '@/components/Vex'
 import { AddCardDialog } from '@/components/AddCardDialog'
 import { Button, ButtonLink, buttonClass, Code, Empty, Pill } from '@/components/ui'
 import { useUI } from '@/app/ui-context'
@@ -264,7 +265,19 @@ function ResourceView({ resource: r }: { resource: Resource }) {
             {writing.length > 0 && <TaskList title="Writing prompts" tasks={writing} />}
             {tasks.length === 0 && (
               <div className="mt-4">
-                <Empty title="No tasks written for this resource" action={<CopyButton size="sm" getText={() => buildGenerateTasksPrompt(r)} icon={<Wand2 size={13} />} toast="Prompt copied — paste it into your AI">Generate tasks with AI</CopyButton>}>
+                <Empty
+                  title="No tasks written for this resource"
+                  action={
+                    <div className="flex flex-wrap gap-2">
+                      <VexButton size="sm" label={`Practice questions: ${r.title}`} getText={() => buildGenerateTasksPrompt(r)}>
+                        Generate with Vex
+                      </VexButton>
+                      <CopyButton size="sm" getText={() => buildGenerateTasksPrompt(r)} icon={<Wand2 size={13} />} toast="Prompt copied — paste it into your AI">
+                        Copy prompt
+                      </CopyButton>
+                    </div>
+                  }
+                >
                   Ask an AI to write practice questions from this topic.
                 </Empty>
               </div>
@@ -287,7 +300,16 @@ function ResourceView({ resource: r }: { resource: Resource }) {
                 icon={<Wand2 size={15} />}
                 title="Generate tasks"
                 text="Copy a prompt asking an AI for 5 new exam-style questions."
-                action={<CopyButton size="sm" getText={() => buildGenerateTasksPrompt(r)} toast="Prompt copied — paste it into your AI">Copy prompt</CopyButton>}
+                action={
+                  <div className="flex flex-wrap gap-1.5">
+                    <VexButton size="sm" label={`Practice questions: ${r.title}`} getText={() => buildGenerateTasksPrompt(r)}>
+                      Ask Vex
+                    </VexButton>
+                    <CopyButton size="sm" variant="ghost" getText={() => buildGenerateTasksPrompt(r)} toast="Prompt copied — paste it into your AI">
+                      Copy prompt
+                    </CopyButton>
+                  </div>
+                }
               />
               <ActionTile
                 icon={<Plus size={15} />}
@@ -298,6 +320,9 @@ function ResourceView({ resource: r }: { resource: Resource }) {
                     <Button size="sm" onClick={() => setAddOpen(true)}>
                       Add card
                     </Button>
+                    <VexButton size="sm" variant="secondary" label={`Flashcards: ${r.title}`} getText={() => buildFlashcardPrompt(r)}>
+                      Ask Vex
+                    </VexButton>
                     <CopyButton size="sm" variant="ghost" getText={() => buildFlashcardPrompt(r)} toast="Flashcard prompt copied">
                       AI prompt
                     </CopyButton>

@@ -1,6 +1,8 @@
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Check, FileCheck2, FileText, GraduationCap, Layers, NotebookPen, RotateCcw } from 'lucide-react'
+import { ArrowRight, Check, FileCheck2, FileText, GraduationCap, Layers, NotebookPen, RotateCcw, School } from 'lucide-react'
+import { fetchClassroom, type ClassroomItem } from '@/lib/vex'
+import { useVex, VexButton } from '@/components/Vex'
 import { cardsForResource, getResource, getTask, subject, tasksForResource, TYPE_LABEL } from '@/lib/data'
 import { actions, useStore } from '@/lib/storage'
 import { useAllCards } from '@/lib/hooks'
@@ -126,6 +128,8 @@ export default function Overview() {
         <Tile onClick={openRevise} icon={<GraduationCap size={15} />} label="Revise with AI" hint="One prompt, whole syllabus" />
       </div>
 
+      <ClassroomDue />
+
       {weak.length > 0 && (
         <p className="mt-4 text-[13px] text-fg-3">
           Weak spots:{' '}
@@ -144,6 +148,52 @@ export default function Overview() {
         <ExamPanel />
       </div>
     </Page>
+  )
+}
+
+/** The next few things due in Google Classroom, with a one-tap "Ask Vex". Shows nothing until Classroom is connected. */
+function ClassroomDue() {
+  const { session } = useVex()
+  const [items, setItems] = useState<ClassroomItem[]>([])
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    if (session.state !== 'signedin') return
+    let live = true
+    fetchClassroom()
+      .then((d) => live && (setItems(d.connected && !d.needsReconnect ? d.items.slice(0, 3) : []), setReady(true)))
+      .catch(() => live && setReady(true))
+    return () => {
+      live = false
+    }
+  }, [session.state])
+  if (session.state !== 'signedin' || !ready || items.length === 0) return null
+  return (
+    <section className="mt-3 rounded-none border border-line-2 bg-ink-1 p-4 sm:p-5" aria-label="Due in Classroom">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="eyebrow flex items-center gap-2">
+          <School size={14} className="text-accent" /> Due in Classroom
+        </div>
+        <Link to="/classroom" className="text-[12px] text-fg-3 underline-offset-2 hover:text-fg hover:underline">
+          See all
+        </Link>
+      </div>
+      <ul className="divide-y divide-line">
+        {items.map((w) => (
+          <li key={w.id} className="flex flex-wrap items-center gap-3 py-2.5">
+            <span className={`w-20 shrink-0 font-mono text-[12px] tabular-nums ${w.hot ? 'text-warn' : 'text-fg-2'}`}>
+              {w.n} {w.unit}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[14px] font-medium text-fg">{w.title}</span>
+              <span className="block truncate text-[12px] text-fg-3">{w.course}</span>
+            </span>
+            <VexButton size="sm" variant="secondary" label={`Help with: ${w.title}`} getText={() => `I’m a Class 8 student. Help me with this assignment from Google Classroom. Explain it step by step so I understand it.\n\n${w.text}`}>
+              Ask Vex
+            </VexButton>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

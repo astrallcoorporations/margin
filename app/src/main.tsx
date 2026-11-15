@@ -15,6 +15,8 @@ import FlashcardStudy from './pages/FlashcardStudy'
 import Review from './pages/Review'
 import Library from './pages/Library'
 import Settings from './pages/Settings'
+import Classroom from './pages/Classroom'
+import Subject from './pages/Subject'
 import Tests from './pages/Tests'
 import TestRun from './pages/TestRun'
 import TestResult from './pages/TestResult'
@@ -34,6 +36,8 @@ const router = createBrowserRouter([
       { path: '/flashcards/:deckId', element: <FlashcardStudy /> },
       { path: '/review', element: <Review /> },
       { path: '/tests', element: <Tests /> },
+      { path: '/classroom', element: <Classroom /> },
+      { path: '/subjects/:id', element: <Subject /> },
       { path: '/tests/:testId', element: <TestRun /> },
       { path: '/tests/:testId/results/:attemptId', element: <TestResult /> },
       { path: '/library/:category', element: <Library /> },

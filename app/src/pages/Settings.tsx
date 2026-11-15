@@ -6,7 +6,9 @@ import { actions, exportState, parseImport, useStore } from '@/lib/storage'
 import { fileExists } from '@/lib/files'
 import { Page, PageHeader } from '@/components/blocks'
 import { useToast } from '@/components/toast'
-import { Button, Section } from '@/components/ui'
+import { Button, buttonClass, Section } from '@/components/ui'
+import { useVex } from '@/components/Vex'
+import { signInUrl, VEX_URL } from '@/lib/vex'
 import { useUI } from '@/app/ui-context'
 
 export default function Settings() {
@@ -18,6 +20,7 @@ export default function Settings() {
   const fileInput = useRef<HTMLInputElement>(null)
   const notify = useToast()
   const { openShortcuts } = useUI()
+  const { session, refresh, leave } = useVex()
 
   const manifest = [...subject.resources.flatMap((r) => r.files), ...subject.steps.flatMap((s) => s.files ?? [])]
   const missing = manifest.filter((f) => !fileExists(f.path))
@@ -103,6 +106,48 @@ export default function Settings() {
           />
         </div>
         <p className="mt-3 max-w-lg text-[12.5px] leading-relaxed text-fg-3">Use a backup to move your progress to another browser or computer.</p>
+      </Section>
+
+      <Section title="Vex (AI and Classroom)">
+        <dl className="mb-4 grid max-w-lg grid-cols-[110px_1fr] gap-x-4 gap-y-2 text-[13px]">
+          <dt className="text-fg-3">Status</dt>
+          <dd className="text-fg">
+            {session.state === 'signedin' && 'Connected'}
+            {session.state === 'signedout' && (session.unavailable ? 'Running, but Google sign-in isn’t set up yet' : 'Running, not signed in')}
+            {session.state === 'offline' && 'Not running'}
+            {session.state === 'loading' && 'Checking…'}
+          </dd>
+          <dt className="text-fg-3">Address</dt>
+          <dd className="font-mono text-[12px] break-all text-fg">{VEX_URL}</dd>
+          {session.state === 'signedin' && (
+            <>
+              <dt className="text-fg-3">Signed in as</dt>
+              <dd className="text-fg">{session.email || 'Local test user'}</dd>
+              <dt className="text-fg-3">Credits</dt>
+              <dd className="text-fg tabular-nums">
+                {session.credits.left} of {session.credits.max} left today
+              </dd>
+            </>
+          )}
+        </dl>
+        <div className="flex flex-wrap gap-2">
+          {session.state === 'signedout' && !session.unavailable && (
+            <a href={signInUrl()} className={buttonClass('primary')}>
+              Sign up / Sign in with Google
+            </a>
+          )}
+          {session.state === 'signedin' && !session.open && (
+            <Button variant="ghost" onClick={leave}>
+              Sign out
+            </Button>
+          )}
+          <Button variant="ghost" onClick={refresh}>
+            Check again
+          </Button>
+        </div>
+        <p className="mt-3 max-w-lg text-[12.5px] leading-relaxed text-fg-3">
+          Margin asks Vex to answer prompts and to read Google Classroom. Only ked.edu.in school accounts and a short approved list can sign in. To point Margin at a different Vex, set <span className="font-mono">VITE_VEX_URL</span> in <span className="font-mono">app/.env</span>.
+        </p>
       </Section>
 
       <Section title="Study folder">

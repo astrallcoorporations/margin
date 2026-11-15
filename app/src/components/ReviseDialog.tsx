@@ -7,6 +7,7 @@ import { getState, useStore } from '@/lib/storage'
 import { cn } from '@/lib/utils'
 import { CopyButton } from './CopyButton'
 import { AiLinks } from './AiLinks'
+import { VexButton } from './Vex'
 import { Modal } from './ui'
 
 const MODES: { id: ReviseOptions['mode']; label: string; hint: string }[] = [
@@ -98,9 +99,23 @@ export function ReviseDialog({ open, onClose }: { open: boolean; onClose: () => 
           </span>
           <AiLinks />
         </div>
-        <CopyButton variant="primary" getText={() => buildRevisePrompt(opts, getState(), cards)} icon={<GraduationCap size={14} />} toast="Revision prompt copied — paste it into your AI">
-          Copy revision prompt
-        </CopyButton>
+        <div className="flex flex-wrap items-center gap-2">
+          <CopyButton getText={() => buildRevisePrompt(opts, getState(), cards)} icon={<GraduationCap size={14} />} toast="Revision prompt copied — paste it into your AI">
+            Copy revision prompt
+          </CopyButton>
+          <VexButton
+            label="Revision session"
+            title="Vex runs the revision session here. If the prompt is too long for Vex, key points are left out."
+            getText={() => {
+              // Vex runs on a small free quota: drop the key-point text if the full prompt would not fit.
+              const full = buildRevisePrompt(opts, getState(), cards)
+              return full.length > 24000 && opts.keyPoints ? buildRevisePrompt({ ...opts, keyPoints: false }, getState(), cards) : full
+            }}
+            onSent={onClose}
+          >
+            Revise with Vex
+          </VexButton>
+        </div>
       </div>
     </Modal>
   )

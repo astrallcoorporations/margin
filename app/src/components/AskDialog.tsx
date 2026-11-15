@@ -7,6 +7,7 @@ import { useAllCards } from '@/lib/hooks'
 import { useStore } from '@/lib/storage'
 import { CopyButton } from './CopyButton'
 import { AiLinks } from './AiLinks'
+import { VexButton } from './Vex'
 import { Modal } from './ui'
 
 const PAGE_NAMES: Record<string, string> = {
@@ -136,14 +137,22 @@ export function AskDialog({ open, onClose, resourceId }: { open: boolean; onClos
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3">
         <AiLinks />
-        <CopyButton
-          variant="primary"
-          getText={async () => buildAskPrompt(question, ctx, withNotes && topic ? await notesText(topic) : null)}
-          icon={<Sparkles size={14} />}
-          toast="Copied — paste it into your AI"
-        >
-          Copy prompt
-        </CopyButton>
+        <div className="flex flex-wrap items-center gap-2">
+          <CopyButton
+            getText={async () => buildAskPrompt(question, ctx, withNotes && topic ? await notesText(topic) : null)}
+            icon={<Sparkles size={14} />}
+            toast="Copied — paste it into your AI"
+          >
+            Copy prompt
+          </CopyButton>
+          <VexButton
+            label={topic ? `Question about ${topic.title}` : 'Question'}
+            getText={async () => buildAskPrompt(question, ctx, withNotes && topic ? await notesText(topic) : null)}
+            onSent={onClose}
+          >
+            Ask Vex
+          </VexButton>
+        </div>
       </div>
     </Modal>
   )

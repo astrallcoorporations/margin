@@ -9,6 +9,7 @@ import { cn, pad2, words } from '@/lib/utils'
 import type { Task } from '@/types'
 import { Breadcrumbs, Page } from '@/components/blocks'
 import { CopyButton } from '@/components/CopyButton'
+import { VexButton } from '@/components/Vex'
 import { useToast } from '@/components/toast'
 import { Button, Kbd, Pill } from '@/components/ui'
 import NotFound from './NotFound'
@@ -136,6 +137,9 @@ function TaskView({ task }: { task: Task }) {
           <Button variant="primary" onClick={start}>
             Start task <ArrowRight size={14} />
           </Button>
+          <VexButton variant="secondary" label={`Plan: ${task.title}`} getText={() => buildTaskOnlyPrompt(task)} title="Vex helps you plan your answer, here">
+            Plan with Vex
+          </VexButton>
           <CopyButton variant="ghost" getText={() => buildTaskOnlyPrompt(task)} toast="Question copied — ask your AI to help you plan">
             Copy prompt
           </CopyButton>
@@ -180,9 +184,27 @@ function TaskView({ task }: { task: Task }) {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <CopyButton variant="primary" getText={() => buildReviewPrompt(task, text)} icon={<Sparkles size={14} />} toast="Review prompt copied — paste it into ChatGPT, Claude or any AI">
+            <VexButton label={`Review: ${task.title}`} getText={() => buildReviewPrompt(task, text)} title="Vex reads your answer and reviews it here">
+              Review with Vex
+            </VexButton>
+            <CopyButton getText={() => buildReviewPrompt(task, text)} icon={<Sparkles size={14} />} toast="Review prompt copied — paste it into ChatGPT, Claude or any AI">
               Copy for AI review
             </CopyButton>
+            <VexButton
+              variant="secondary"
+              label={`Review with notes: ${task.title}`}
+              title="Vex reviews your answer against your class notes"
+              getText={async () => {
+                try {
+                  return buildReviewPrompt(task, text, await sourceContext(task))
+                } catch (e) {
+                  notify(e instanceof Error ? e.message : 'Couldn’t read the notes', 'error')
+                  return buildReviewPrompt(task, text)
+                }
+              }}
+            >
+              Review with Vex + notes
+            </VexButton>
             <CopyButton
               getText={async () => {
                 try {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom'
-import { BookOpen, FileCheck2, GraduationCap, Layers, LayoutGrid, Menu, NotebookPen, RotateCcw, Search, Settings, Sparkles, X } from 'lucide-react'
+import { BookOpen, FileCheck2, GraduationCap, Layers, LayoutGrid, Menu, NotebookPen, RotateCcw, School, Search, Settings, Sparkles, X } from 'lucide-react'
 import { orderedSteps, resourcesInStep, subject } from '@/lib/data'
 import { subjects } from '@/data/catalog'
 import { useStore } from '@/lib/storage'
@@ -10,6 +10,7 @@ import { CommandPalette } from '@/components/CommandPalette'
 import { AskDialog } from '@/components/AskDialog'
 import { ShortcutsDialog } from '@/components/ShortcutsDialog'
 import { ReviseDialog } from '@/components/ReviseDialog'
+import { useVex, VexAccount, VexNavButton, VexProvider } from '@/components/Vex'
 import { UIContext } from './ui-context'
 import { PixelField } from '@/components/Pixels'
 
@@ -19,10 +20,11 @@ const sectionNav = [
   { to: '/practice', label: 'Practice', icon: NotebookPen },
   { to: '/flashcards', label: 'Flashcards', icon: Layers },
   { to: '/tests', label: 'Tests', icon: FileCheck2 },
+  { to: '/classroom', label: 'Classroom', icon: School },
   { to: '/review', label: 'Review', icon: RotateCcw },
 ]
 
-const GO: Record<string, string> = { h: '/', l: '/learn', p: '/practice', f: '/flashcards', r: '/review', t: '/tests', s: '/settings' }
+const GO: Record<string, string> = { h: '/', l: '/learn', p: '/practice', f: '/flashcards', r: '/review', t: '/tests', c: '/classroom', s: '/settings' }
 
 export function AppShell() {
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -94,6 +96,7 @@ export function AppShell() {
 
   return (
     <UIContext.Provider value={controls}>
+     <VexProvider>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[70] focus:rounded-md focus:bg-fg focus:px-3 focus:py-2 focus:text-ink-0">
         Skip to content
       </a>
@@ -131,6 +134,7 @@ export function AppShell() {
       <AskDialog open={askFor !== undefined} resourceId={askFor ?? undefined} onClose={closeAsk} />
       <ShortcutsDialog open={helpOpen} onClose={closeHelp} />
       <ReviseDialog open={reviseOpen} onClose={closeRevise} />
+     </VexProvider>
     </UIContext.Provider>
   )
 }
@@ -154,7 +158,10 @@ function Topbar({ onMenu, onSearch, onAsk, onRevise }: { onMenu: () => void; onS
   const initials = name.trim() ? name.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() : null
   const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
   const location = useLocation()
+  const { library } = useVex()
+  const classroomSubjects = library?.index?.subjects ?? []
   const inSettings = location.pathname.startsWith('/settings')
+  const inClassroomSubject = location.pathname.startsWith('/subjects/')
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-ink-0/90 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-3 px-4 lg:px-6">
@@ -216,10 +223,29 @@ function Topbar({ onMenu, onSearch, onAsk, onRevise }: { onMenu: () => void; onS
         </div>
       </div>
 
-      {/* Subject tabs — English is the only subject for now; more slot in from src/data/catalog.ts */}
+      {/* Subject tabs: the curated English study set first, then every Google Classroom course Vex has downloaded. New courses appear here by themselves. */}
       <nav className="mx-auto flex h-12 max-w-[1440px] items-end gap-6 overflow-x-auto px-4 lg:px-6" aria-label="Subjects">
+        {classroomSubjects.map((c) => {
+          const active = location.pathname === `/subjects/${c.id}`
+          return (
+            <Link
+              key={c.id}
+              to={`/subjects/${c.id}`}
+              aria-current={active ? 'page' : undefined}
+              title="From Google Classroom"
+              className={cn(
+                'relative order-2 flex h-full items-center font-pixel text-[11px] tracking-[0.08em] whitespace-nowrap uppercase transition-colors',
+                active ? 'text-fg' : 'text-fg-3 hover:text-fg-2',
+              )}
+            >
+              {c.name}
+              {subjects.some((x) => x.name.toLowerCase() === c.name.toLowerCase()) && <span className="ml-1.5 text-fg-3">Classroom</span>}
+              {active && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" aria-hidden="true" />}
+            </Link>
+          )
+        })}
         {subjects.map((s) => {
-          const active = s.id === subject.id && !inSettings
+          const active = s.id === subject.id && !inSettings && !inClassroomSubject
           return (
             <Link
               key={s.id}
@@ -240,6 +266,30 @@ function Topbar({ onMenu, onSearch, onAsk, onRevise }: { onMenu: () => void; onS
   )
 }
 
+/** Every Google Classroom course Vex has downloaded, as a short list in the sidebar. */
+function ClassroomSubjects() {
+  const { library } = useVex()
+  const list = library?.index?.subjects ?? []
+  if (list.length === 0) return null
+  return (
+    <div className="mt-7">
+      <div className="mb-1.5 border-b border-line px-2.5 pb-2 font-pixel text-[11px] tracking-[0.08em] text-fg uppercase">Classroom subjects</div>
+      <ul className="space-y-0.5">
+        {list.map((s) => (
+          <li key={s.id}>
+            <NavLink
+              to={`/subjects/${s.id}`}
+              className={({ isActive }) => cn('flex h-[30px] items-center gap-2.5 px-2.5 text-[13.5px] transition-colors duration-200', isActive ? 'bg-accent font-medium text-black' : 'sweep text-fg-2 hover:text-fg')}
+            >
+              <span className="truncate">{s.name}</span>
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function SidebarNav() {
   const location = useLocation()
   const sectionClass = ({ isActive }: { isActive: boolean }) =>
@@ -249,6 +299,7 @@ function SidebarNav() {
     )
   return (
     <nav className="flex h-full flex-col overflow-y-auto px-4 pt-6 pb-4" aria-label="English">
+      <VexAccount />
       <div className="mb-2 border-b border-line px-2.5 pb-2.5 font-pixel text-[11px] tracking-[0.08em] text-fg uppercase">{subject.name}</div>
       <ul className="space-y-0.5">
         {sectionNav.map(({ to, label, icon: Icon, end }) => (
@@ -263,7 +314,12 @@ function SidebarNav() {
             </NavLink>
           </li>
         ))}
+        <li>
+          <VexNavButton className="group flex h-[30px] w-full items-center gap-2.5 px-2.5 text-left text-[13.5px] text-fg-2 transition-colors duration-200 hover:text-fg" />
+        </li>
       </ul>
+
+      <ClassroomSubjects />
 
       {orderedSteps.map((step) => (
         <div key={step.id} className="mt-7">
