@@ -788,6 +788,60 @@ export const tests: MockTest[] = [
       },
     ],
   },
+  {
+    id: 'reported-speech-worksheet',
+    title: 'Reported Speech Worksheet',
+    kind: 'worksheet',
+    description: 'Statements, questions and commands turned into reported speech, using the standard rules.',
+    minutes: 15,
+    sections: [
+      {
+        id: 's1',
+        title: 'Fill the gap',
+        note: 'One word in each gap.',
+        questions: [
+          { id: id('q'), kind: 'fill', prompt: '“I am tired,” she said. → She said that she ______ tired.', accept: ['was'], marks: 1, resourceId: 'reported-speech' },
+          { id: id('q'), kind: 'fill', prompt: '“We will win the match,” said the captain. → The captain said that they ______ win the match.', accept: ['would'], marks: 1, resourceId: 'reported-speech' },
+          { id: id('q'), kind: 'fill', prompt: '“I can swim,” Ravi said. → Ravi said that he ______ swim.', accept: ['could'], marks: 1, resourceId: 'reported-speech' },
+          { id: id('q'), kind: 'fill', prompt: '“I have finished my homework,” Meera said. → Meera said that she ______ finished her homework.', accept: ['had'], marks: 1, resourceId: 'reported-speech' },
+          { id: id('q'), kind: 'fill', prompt: '“Where do you live?” he asked me. → He asked me where I ______.', accept: ['lived'], marks: 1, resourceId: 'reported-speech' },
+        ],
+      },
+      {
+        id: 's2',
+        title: 'Choose the correct answer',
+        questions: [
+          mcq('“I went to the market yesterday,” she said. → She said that she ______ to the market the day before.', ['went', 'had gone', 'has gone', 'goes'], 1, 1, { resourceId: 'reported-speech', explain: 'The past simple moves back to the past perfect, and yesterday becomes the day before.' }),
+          mcq('“Close the window,” the teacher said to us. → The teacher told us ______ the window.', ['close', 'to close', 'closed', 'closing'], 1, 1, { resourceId: 'reported-speech' }),
+          mcq('He said, “I will call you tomorrow.” → He said that he would call me ______.', ['tomorrow', 'the next day', 'yesterday', 'today'], 1, 1, { resourceId: 'reported-speech' }),
+          mcq('“Do you like tea?” she asked. → She asked ______ I liked tea.', ['that', 'if', 'what', 'to'], 1, 1, { resourceId: 'reported-speech', explain: 'Yes/no questions are reported with if or whether.' }),
+          mcq('Which report is correct when the reporting verb is in the present?', ['She says, “I am busy.” → She says that she was busy.', 'She says, “I am busy.” → She says that she is busy.', 'She said, “I am busy.” → She said that she is busy.', 'She said, “I am busy.” → She said that she will be busy.'], 1, 1, { resourceId: 'reported-speech', explain: 'When the reporting verb is in the present (says), the tense does not move back.' }),
+        ],
+      },
+    ],
+  },
+  {
+    id: 'debate-quiz',
+    title: 'Step 26 Debate Quiz',
+    kind: 'worksheet',
+    description: 'Quick check of the Step 26 debate task: stages, timings and expectations.',
+    minutes: 8,
+    sections: [
+      {
+        id: 's1',
+        title: 'The debate task',
+        questions: [
+          mcq('How long is each speaker’s opening statement?', ['30 seconds', '1 minute', '2 minutes', '5 minutes'], 0, 1, { resourceId: 'step-26-presentation' }),
+          mcq('What is the minimum number of arguments each speaker should give?', ['One', 'Two', 'Three', 'Five'], 2, 1, { resourceId: 'step-26-presentation' }),
+          mcq('About how long does one pair’s debate last in total?', ['2 minutes', '5 minutes', '10 minutes', '15 minutes'], 1, 1, { resourceId: 'step-26-presentation' }),
+          mcq('Which stage comes straight after the main arguments?', ['Opening statement', 'Rebuttal', 'Closing statement', 'Reflection'], 1, 1, { resourceId: 'step-26-presentation' }),
+          mcq('Speaker 1 in the pair is the:', ['Proposition, supporting the statement', 'Opposition, challenging it', 'Judge', 'Timekeeper'], 0, 1, { resourceId: 'step-26-presentation' }),
+          mcq('Which should you avoid?', ['Disagreeing respectfully', 'Reading directly from a written script', 'Using real-life examples', 'Preparing for the other speaker’s points'], 1, 1, { resourceId: 'step-26-presentation' }),
+          mcq('A debate is mainly about:', ['Proving the other person wrong', 'Examining different perspectives with respect', 'Speaking as fast as possible', 'Memorising a script'], 1, 1, { resourceId: 'step-26-presentation' }),
+        ],
+      },
+    ],
+  },
 ]
 
 export const getTest = (testId: string) => tests.find((t) => t.id === testId)
