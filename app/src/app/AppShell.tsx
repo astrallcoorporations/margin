@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom'
-import { BookOpen, FileCheck2, GraduationCap, Layers, LayoutGrid, Menu, NotebookPen, RotateCcw, School, Search, Settings, Sparkles, X } from 'lucide-react'
+import { BookOpen, ClipboardList, FileCheck2, GraduationCap, Layers, LayoutGrid, Menu, NotebookPen, RotateCcw, School, Search, Settings, Sparkles, X } from 'lucide-react'
 import { orderedSteps, resourcesInStep, subject } from '@/lib/data'
 import { subjects, switchSubject } from '@/data/catalog'
 import { useStore } from '@/lib/storage'
@@ -22,6 +22,7 @@ const sectionNav = [
   { to: '/tests', label: 'Tests', icon: FileCheck2 },
   { to: '/classroom', label: 'Classroom', icon: School },
   { to: '/review', label: 'Review', icon: RotateCcw },
+  { to: '/logbook', label: 'Logbook', icon: ClipboardList },
 ]
 
 const GO: Record<string, string> = { h: '/', l: '/learn', p: '/practice', f: '/flashcards', r: '/review', t: '/tests', c: '/classroom', s: '/settings' }
