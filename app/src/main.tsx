@@ -37,6 +37,7 @@ const router = createBrowserRouter([
       { path: '/review', element: <Review /> },
       { path: '/tests', element: <Tests /> },
       { path: '/classroom', element: <Classroom /> },
+      { path: '/classroom/:courseId', element: <Classroom /> },
       { path: '/subjects/:id', element: <Subject /> },
       { path: '/tests/:testId', element: <TestRun /> },
       { path: '/tests/:testId/results/:attemptId', element: <TestResult /> },

@@ -19,8 +19,9 @@ export type VexModel = { id: string; name: string; short?: string; what?: string
 export type VexCredits = { left: number; max: number }
 
 export type Attached = { id: string; title: string }
-export type ClassroomItem = { id: string; code: string; course: string; title: string; detail: string; n: string; unit: string; hot: boolean; link: string; text: string; c: string; files?: Attached[] }
-export type StreamPost = { id: string; kind: 'announcement' | 'assignment' | 'material'; course: string; title: string; text: string; at: number; link: string; full: string; files?: Attached[] }
+export type CourseInfo = { id: string; name: string; section: string; link: string }
+export type ClassroomItem = { courseId?: string; topic?: string; id: string; code: string; course: string; title: string; detail: string; n: string; unit: string; hot: boolean; link: string; text: string; c: string; files?: Attached[] }
+export type StreamPost = { courseId?: string; topic?: string; id: string; kind: 'announcement' | 'assignment' | 'material'; course: string; title: string; text: string; at: number; link: string; full: string; files?: Attached[] }
 export type ClassroomData = {
   configured: boolean
   connected: boolean
@@ -30,6 +31,7 @@ export type ClassroomData = {
   hidden: number
   partial: boolean
   at: number
+  courses: CourseInfo[]
 }
 
 export type VexSession =
@@ -73,7 +75,7 @@ export async function fetchClassroom(fresh = false): Promise<ClassroomData> {
   if (r.status === 401) throw new VexError('Sign in to see Classroom.', 'signin')
   const j = await r.json().catch(() => ({}))
   if (!r.ok) throw new VexError(j.error || `Classroom didn’t answer (${r.status}).`, 'server')
-  return { configured: !!j.configured, connected: !!j.connected, needsReconnect: !!j.needsReconnect, items: j.items ?? [], stream: j.stream ?? [], hidden: j.hidden ?? 0, partial: !!j.partial, at: j.at ?? 0 }
+  return { configured: !!j.configured, connected: !!j.connected, needsReconnect: !!j.needsReconnect, items: j.items ?? [], stream: j.stream ?? [], hidden: j.hidden ?? 0, partial: !!j.partial, at: j.at ?? 0, courses: j.courses ?? [] }
 }
 
 export class VexError extends Error {

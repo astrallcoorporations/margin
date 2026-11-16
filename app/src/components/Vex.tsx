@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Copy, ExternalLink, LogIn, LogOut, Paperclip, Plus, RotateCcw, Send, Square, X } from 'lucide-react'
-import { ATTACH_ACCEPT, MAX_ATTACH, askVex, fetchLibrary, readAttachment, takeAttachedImages, signInUrl, signOut, startSync, vexSession, VexError, VEX_SITE, type Attachment, type LibraryData, type VexCredits, type VexMessage, type VexSession } from '@/lib/vex'
+import { ATTACH_ACCEPT, MAX_ATTACH, askVex, fetchLibrary, readAttachment, takeAttachedImages, signInUrl, signOut, startSync, vexSession, VexError, VEX_SITE, type Attachment, type LibraryData, type VexCredits, type VexModel, type VexMessage, type VexSession } from '@/lib/vex'
 import { renderMarkdown } from '@/lib/md'
 import { copyText } from '@/lib/clipboard'
 import { buttonClass } from './ui'
@@ -349,29 +349,10 @@ export function VexProvider({ children }: { children: ReactNode }) {
                     )}
                   </div>
                   <footer className="shrink-0 border-t border-line p-3">
-                    {models.length > 0 && (
-                      <div className="mb-2 flex items-center gap-2">
-                        <label htmlFor="vex-model" className="sr-only">
-                          Model
-                        </label>
-                        <div className="relative min-w-0 flex-1">
-                          <select
-                            id="vex-model"
-                            value={picked?.id ?? ''}
-                            onChange={(e) => chooseModel(e.target.value)}
-                            disabled={busy}
-                            className="w-full min-w-0 appearance-none truncate border border-line-2 bg-ink-2 py-1.5 pr-8 pl-2.5 font-mono text-[11.5px] text-fg focus:border-accent/50 focus:outline-none disabled:opacity-60"
-                          >
-                            {models.map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.name} · {m.cost} {m.cost === 1 ? 'credit' : 'credits'}
-                                {m.vision ? ' · photos' : ''}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown size={13} className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-fg-3" />
-                        </div>
-                        {picked?.what && <span className="hidden truncate text-[11.5px] text-fg-3 sm:block">{picked.what}</span>}
+                    {models.length > 0 && picked && (
+                      <div className="mb-2 flex items-center gap-3">
+                        <ModelMenu models={models} picked={picked} credits={credits?.left} disabled={busy} onPick={chooseModel} />
+                        {attach.some((a) => a.kind === 'image' || a.images?.length) && !picked.vision && <span className="truncate text-[11.5px] text-fg-3">Photos switch to the photo model (+1 credit)</span>}
                       </div>
                     )}
                     {attach.length > 0 && (
@@ -436,6 +417,78 @@ export function VexProvider({ children }: { children: ReactNode }) {
           document.body,
         )}
     </Ctx.Provider>
+  )
+}
+
+/** The model picker: a pill that opens a short list, each model with what it is good for, its credit cost and whether it reads photos. */
+function ModelMenu({ models, picked, credits, disabled, onPick }: { models: VexModel[]; picked: VexModel; credits?: number; disabled: boolean; onPick: (id: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const down = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false)
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', down)
+    document.addEventListener('keydown', key, true)
+    return () => {
+      document.removeEventListener('mousedown', down)
+      document.removeEventListener('keydown', key, true)
+    }
+  }, [open])
+  return (
+    <div ref={ref} className="relative min-w-0">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="flex max-w-full items-center gap-2 border border-line-2 bg-ink-2 py-1.5 pr-2.5 pl-3 text-left transition-colors hover:border-fg-3 focus-visible:border-accent focus-visible:outline-none disabled:opacity-60"
+      >
+        <span className="size-1.5 shrink-0 bg-accent" aria-hidden="true" />
+        <span className="truncate font-mono text-[12px] text-fg">{picked.name}</span>
+        <span className="shrink-0 font-mono text-[11px] text-fg-3">
+          {picked.cost} cr
+        </span>
+        <ChevronDown size={13} className={cn('shrink-0 text-fg-3 transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <ul role="listbox" aria-label="Choose a model" className="absolute bottom-full left-0 z-10 mb-2 w-[min(420px,calc(100vw-48px))] border border-line-2 bg-ink-1 py-1 shadow-[0_-18px_50px_-12px_rgba(0,0,0,0.85)]">
+          {models.map((m) => {
+            const on = m.id === picked.id
+            const short = credits !== undefined && credits < m.cost
+            return (
+              <li key={m.id} role="option" aria-selected={on}>
+                <button
+                  onClick={() => {
+                    onPick(m.id)
+                    setOpen(false)
+                  }}
+                  disabled={short}
+                  className={cn('flex w-full items-start gap-3 px-3.5 py-2.5 text-left transition-colors hover:bg-ink-3 disabled:opacity-40', on && 'bg-ink-2')}
+                >
+                  <span className={cn('mt-1.5 size-2 shrink-0 border', on ? 'border-accent bg-accent' : 'border-fg-3')} aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate font-mono text-[12.5px] text-fg">{m.name}</span>
+                      {m.vision && <span className="shrink-0 border border-line-2 px-1 font-mono text-[9.5px] tracking-[0.06em] text-fg-2 uppercase">Photos</span>}
+                    </span>
+                    {(m.what || m.short) && <span className="mt-0.5 block text-[12px] leading-snug text-fg-3">{m.what || m.short}</span>}
+                  </span>
+                  <span className="shrink-0 pt-0.5 font-mono text-[11.5px] text-fg-2 tabular-nums">
+                    {m.cost} {m.cost === 1 ? 'credit' : 'credits'}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
   )
 }
 

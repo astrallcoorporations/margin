@@ -162,6 +162,7 @@ function Topbar({ onMenu, onSearch, onAsk, onRevise }: { onMenu: () => void; onS
   const classroomSubjects = library?.index?.subjects ?? []
   const inSettings = location.pathname.startsWith('/settings')
   const inClassroomSubject = location.pathname.startsWith('/subjects/')
+  const inClassroom = location.pathname.startsWith('/classroom')
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-ink-0/90 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-3 px-4 lg:px-6">
@@ -244,8 +245,20 @@ function Topbar({ onMenu, onSearch, onAsk, onRevise }: { onMenu: () => void; onS
             </Link>
           )
         })}
+        {/* Classroom is its own place: opening it must not leave English looking selected. */}
+        <Link
+          to="/classroom"
+          aria-current={inClassroom ? 'page' : undefined}
+          className={cn(
+            'relative order-3 flex h-full items-center font-pixel text-[11px] tracking-[0.08em] whitespace-nowrap uppercase transition-colors',
+            inClassroom ? 'text-fg' : 'text-fg-3 hover:text-fg-2',
+          )}
+        >
+          Classroom
+          {inClassroom && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" aria-hidden="true" />}
+        </Link>
         {subjects.map((s) => {
-          const active = s.id === subject.id && !inSettings && !inClassroomSubject
+          const active = s.id === subject.id && !inSettings && !inClassroomSubject && !inClassroom
           return (
             <Link
               key={s.id}
