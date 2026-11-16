@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom'
-import { BookOpen, ClipboardList, Megaphone, FileCheck2, GraduationCap, Layers, LayoutGrid, Menu, NotebookPen, RotateCcw, School, Search, Settings, Sparkles, X } from 'lucide-react'
+import { BookOpen, Check, ChevronDown, ClipboardList, Megaphone, FileCheck2, GraduationCap, Layers, LayoutGrid, Menu, NotebookPen, RotateCcw, School, Search, Settings, Sparkles, X } from 'lucide-react'
 import { orderedSteps, resourcesInStep, subject } from '@/lib/data'
 import { subjects, switchSubject } from '@/data/catalog'
 import { useStore } from '@/lib/storage'
@@ -159,12 +159,6 @@ function Topbar({ onMenu, onSearch, onAsk, onRevise }: { onMenu: () => void; onS
   const name = useStore((s) => s.profile.name)
   const initials = name.trim() ? name.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() : null
   const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
-  const location = useLocation()
-  const { library } = useVex()
-  const classroomSubjects = library?.index?.subjects ?? []
-  const inSettings = location.pathname.startsWith('/settings')
-  const inClassroomSubject = location.pathname.startsWith('/subjects/')
-  const inClassroom = location.pathname.startsWith('/classroom')
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-ink-0/90 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-3 px-4 lg:px-6">
@@ -173,10 +167,7 @@ function Topbar({ onMenu, onSearch, onAsk, onRevise }: { onMenu: () => void; onS
         </button>
         <div className="flex shrink-0 items-center gap-4 lg:w-[244px]">
           <Brand />
-          <span className="hidden items-center gap-1.5 rounded-md px-2 py-1 text-[12.5px] whitespace-nowrap text-fg-2 xl:flex" title="Current term">
-            <span className="font-pixel text-[11px] tracking-[0.08em] uppercase">Term {subject.term}</span>
-            <span className="bg-fg px-1 font-pixel text-[9px] tracking-wide text-ink-0 uppercase">now</span>
-          </span>
+          <SubjectMenu />
         </div>
 
         <button
@@ -226,60 +217,86 @@ function Topbar({ onMenu, onSearch, onAsk, onRevise }: { onMenu: () => void; onS
         </div>
       </div>
 
-      {/* Subject tabs: the curated English study set first, then every Google Classroom course Vex has downloaded. New courses appear here by themselves. */}
-      <nav className="mx-auto flex h-12 max-w-[1440px] items-end gap-6 overflow-x-auto px-4 lg:px-6" aria-label="Subjects">
-        {classroomSubjects.map((c) => {
-          const active = location.pathname === `/subjects/${c.id}`
-          return (
-            <Link
-              key={c.id}
-              to={`/subjects/${c.id}`}
-              aria-current={active ? 'page' : undefined}
-              title="From Google Classroom"
-              className={cn(
-                'relative order-2 flex h-full items-center font-pixel text-[11px] tracking-[0.08em] whitespace-nowrap uppercase transition-colors',
-                active ? 'text-fg' : 'text-fg-3 hover:text-fg-2',
-              )}
-            >
-              {c.name}
-              {subjects.some((x) => x.name.toLowerCase() === c.name.toLowerCase()) && <span className="ml-1.5 text-fg-3">Classroom</span>}
-              {active && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" aria-hidden="true" />}
-            </Link>
-          )
-        })}
-        {/* Classroom is its own place: opening it must not leave English looking selected. */}
-        <Link
-          to="/classroom"
-          aria-current={inClassroom ? 'page' : undefined}
-          className={cn(
-            'relative order-3 flex h-full items-center font-pixel text-[11px] tracking-[0.08em] whitespace-nowrap uppercase transition-colors',
-            inClassroom ? 'text-fg' : 'text-fg-3 hover:text-fg-2',
-          )}
-        >
-          Classroom
-          {inClassroom && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" aria-hidden="true" />}
-        </Link>
-        {subjects.map((s) => {
-          const active = s.id === subject.id && !inSettings && !inClassroomSubject && !inClassroom
-          const cls = cn(
-            'relative flex h-full items-center font-pixel text-[11px] tracking-[0.08em] whitespace-nowrap uppercase transition-colors',
-            active ? 'text-fg' : 'text-fg-3 hover:text-fg-2',
-          )
-          const mark = active && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" aria-hidden="true" />
-          // The tab for the subject that is showing goes home; any other tab switches the whole app to that subject.
-          return s.id === subject.id ? (
-            <Link key={s.id} to="/" aria-current={active ? 'page' : undefined} className={cls}>
-              {s.name}
-              {mark}
-            </Link>
-          ) : (
-            <button key={s.id} onClick={() => switchSubject(s.id)} className={cls}>
-              {s.name}
-            </button>
-          )
-        })}
-      </nav>
     </header>
+  )
+}
+
+/** Which subject the app shows: a dropdown instead of a row of tabs. Margin's own subjects, Classroom, and any downloaded Classroom subject. */
+function SubjectMenu() {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const location = useLocation()
+  const { library } = useVex()
+  const downloaded = (library?.index?.subjects ?? []).filter((c) => !subjects.some((x) => x.name.toLowerCase() === c.name.toLowerCase()))
+  const inClassroom = location.pathname.startsWith('/classroom')
+  const inLib = location.pathname.startsWith('/subjects/')
+  const current = inClassroom ? 'Classroom' : inLib ? (downloaded.find((c) => location.pathname === `/subjects/${c.id}`)?.name ?? 'Subject') : subject.name
+  useEffect(() => {
+    if (!open) return
+    const down = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false)
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('mousedown', down)
+    document.addEventListener('keydown', key)
+    return () => {
+      document.removeEventListener('mousedown', down)
+      document.removeEventListener('keydown', key)
+    }
+  }, [open])
+  useEffect(() => setOpen(false), [location.pathname])
+  const row = 'flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-[13.5px] transition-colors hover:bg-ink-3'
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="flex h-9 max-w-[200px] items-center gap-2 border border-line-2 bg-ink-1/80 px-3 text-left transition-colors hover:border-fg-3 focus-visible:border-accent focus-visible:outline-none"
+      >
+        <span className="size-1.5 shrink-0 bg-accent" aria-hidden="true" />
+        <span className="min-w-0 truncate font-pixel text-[11px] tracking-[0.08em] text-fg uppercase">{current}</span>
+        <ChevronDown size={13} className={cn('shrink-0 text-fg-3 transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <ul role="listbox" aria-label="Choose a subject" className="absolute top-full left-0 z-40 mt-1 max-h-[70vh] min-w-[230px] overflow-y-auto border border-line-2 bg-ink-1 py-1 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.85)]">
+          {subjects.map((s) => {
+            const on = !inClassroom && !inLib && s.id === subject.id
+            return (
+              <li key={s.id} role="option" aria-selected={on}>
+                {s.id === subject.id ? (
+                  <Link to="/" className={cn(row, on ? 'text-fg' : 'text-fg-2')}>
+                    <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                    {on && <Check size={14} className="shrink-0 text-accent" />}
+                  </Link>
+                ) : (
+                  <button onClick={() => switchSubject(s.id)} className={cn(row, 'text-fg-2')}>
+                    <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                  </button>
+                )}
+              </li>
+            )
+          })}
+          <li role="option" aria-selected={inClassroom} className="border-t border-line">
+            <Link to="/classroom" className={cn(row, inClassroom ? 'text-fg' : 'text-fg-2')}>
+              <span className="min-w-0 flex-1 truncate">Classroom</span>
+              <span className="shrink-0 font-mono text-[10.5px] text-fg-3">all classes</span>
+              {inClassroom && <Check size={14} className="shrink-0 text-accent" />}
+            </Link>
+          </li>
+          {downloaded.length > 0 && (
+            <>
+              <li className="border-t border-line px-3.5 pt-2.5 pb-1 font-mono text-[10.5px] tracking-[0.08em] text-fg-3 uppercase" aria-hidden="true">From Google Classroom</li>
+              {downloaded.map((c) => (
+                <li key={c.id} role="option" aria-selected={location.pathname === `/subjects/${c.id}`}>
+                  <Link to={`/subjects/${c.id}`} className={cn(row, 'text-fg-2')}>
+                    <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                  </Link>
+                </li>
+              ))}
+            </>
+          )}
+        </ul>
+      )}
+    </div>
   )
 }
 

@@ -22,7 +22,7 @@ const stepName = (stepId: string) => {
 }
 
 const examDay = () => {
-  if (!subject.exam) return null
+  if (!subject.exam || !subject.exam.date) return null
   const d = new Date(subject.exam.date + 'T09:00:00')
   const days = Math.ceil((d.setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000)
   const label = new Date(subject.exam.date + 'T09:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })

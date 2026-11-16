@@ -25,7 +25,7 @@ export default function Overview() {
 
   const items = examItems()
   const done = items.filter((i) => revised[i.key]).length
-  const days = exam ? daysUntil(exam.date) : null
+  const days = exam?.date ? daysUntil(exam.date) : null
   const next = items.find((i) => !revised[i.key] && i.resourceId)
   const nextRes = next?.resourceId ? getResource(next.resourceId) : undefined
 
@@ -52,10 +52,15 @@ export default function Overview() {
         <h1 className="text-[56px] leading-[0.92] font-semibold tracking-[-0.055em] text-fg sm:text-[72px]">{subject.term}</h1>
         <div className="mosaic-rule mt-5" aria-hidden="true" />
         <p className="mt-4 text-[15.5px] text-fg-2">
-          {exam && days !== null ? (
+          {exam ? (
             <>
-              Exam <span className="font-medium text-fg">{countdownLabel(days).toLowerCase()}</span>
-              {name ? `, ${name.split(' ')[0]}` : ''} · <span className="text-fg-3">{done} of {items.length} topics revised</span>
+              {days !== null && (
+                <>
+                  Exam <span className="font-medium text-fg">{countdownLabel(days).toLowerCase()}</span>
+                  {name ? `, ${name.split(' ')[0]}` : ''} ·{' '}
+                </>
+              )}
+              <span className="text-fg-3">{done} of {items.length} topics revised</span>
             </>
           ) : (
             subject.tagline

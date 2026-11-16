@@ -26,10 +26,10 @@ export function ExamPanel() {
   const exam = subject.exam
   const revised = useStore((s) => s.revised)
   if (!exam) return null
-  const days = daysUntil(exam.date)
+  const days = exam.date ? daysUntil(exam.date) : null
   const items = examItems()
   const done = items.filter((i) => revised[i.key]).length
-  const date = new Date(exam.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+  const date = !exam.date ? '' : new Date(exam.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
     <section
@@ -39,9 +39,11 @@ export function ExamPanel() {
       <div className="flex flex-wrap items-center gap-x-6 gap-y-4 border-b border-[#232323] bg-[linear-gradient(90deg,rgba(255,213,0,0.05),transparent_70%)] px-5 py-5 sm:px-6">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
-            <span className={cn('px-2.5 py-1 text-[11.5px] font-semibold', days <= 1 && days >= 0 ? 'bg-warn/15 text-warn' : 'bg-accent/15 text-accent')}>
-              {countdownLabel(days)}
-            </span>
+            {days !== null ? (
+              <span className={cn('px-2.5 py-1 text-[11.5px] font-semibold', days <= 1 && days >= 0 ? 'bg-warn/15 text-warn' : 'bg-accent/15 text-accent')}>{countdownLabel(days)}</span>
+            ) : (
+              <span className="bg-accent/15 px-2.5 py-1 text-[11.5px] font-semibold text-accent">{exam.name}</span>
+            )}
             <span className="text-[12.5px] text-fg-3">{date}</span>
           </div>
           <h2 id="exam-h" className="mt-2 text-[20px] font-bold tracking-[-0.025em] text-fg">

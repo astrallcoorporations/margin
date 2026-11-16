@@ -67,8 +67,8 @@ export interface ExamSyllabusGroup {
 
 export interface Exam {
   name: string
-  /** ISO date, e.g. 2026-09-30 */
-  date: string
+  /** ISO date, e.g. 2026-09-30. Leave out until the date is known: the checklist works without it. */
+  date?: string
   /** Syllabus as given in the exam timetable */
   syllabus: ExamSyllabusGroup[]
 }
