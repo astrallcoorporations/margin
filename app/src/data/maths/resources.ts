@@ -10,6 +10,9 @@ const S = 'maths'
 const f = (path: string, role?: Resource['files'][number]['role'], label?: string) => ({ path: `maths/${path}`, role, label })
 
 export const steps: Step[] = [
+  { id: 'step-21', label: 'Step 21', note: 'rational numbers and exponents', order: 21 },
+  { id: 'step-22', label: 'Step 22', note: 'polygons and quadrilaterals', order: 22 },
+  { id: 'step-23', label: 'Step 23', note: 'equations and proportion', order: 23 },
   { id: 'step-24', label: 'Step 24', note: 'squares and cubes', order: 24 },
   { id: 'step-26', label: 'Step 26', note: 'percentages, profit and loss, discount', order: 26 },
   { id: 'maths-revision', label: 'Revision', note: 'learning check', order: 27 },
