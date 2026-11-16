@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, Link } from 'react-router-dom'
 import { BookOpen, FileCheck2, GraduationCap, Layers, LayoutGrid, Menu, NotebookPen, RotateCcw, School, Search, Settings, Sparkles, X } from 'lucide-react'
 import { orderedSteps, resourcesInStep, subject } from '@/lib/data'
-import { subjects } from '@/data/catalog'
+import { subjects, switchSubject } from '@/data/catalog'
 import { useStore } from '@/lib/storage'
 import { cn, isTyping } from '@/lib/utils'
 import { Kbd } from '@/components/ui'
@@ -259,19 +259,21 @@ function Topbar({ onMenu, onSearch, onAsk, onRevise }: { onMenu: () => void; onS
         </Link>
         {subjects.map((s) => {
           const active = s.id === subject.id && !inSettings && !inClassroomSubject && !inClassroom
-          return (
-            <Link
-              key={s.id}
-              to="/"
-              aria-current={active ? 'page' : undefined}
-              className={cn(
-                'relative flex h-full items-center font-pixel text-[11px] tracking-[0.08em] whitespace-nowrap uppercase transition-colors',
-                active ? 'text-fg' : 'text-fg-3 hover:text-fg-2',
-              )}
-            >
+          const cls = cn(
+            'relative flex h-full items-center font-pixel text-[11px] tracking-[0.08em] whitespace-nowrap uppercase transition-colors',
+            active ? 'text-fg' : 'text-fg-3 hover:text-fg-2',
+          )
+          const mark = active && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" aria-hidden="true" />
+          // The tab for the subject that is showing goes home; any other tab switches the whole app to that subject.
+          return s.id === subject.id ? (
+            <Link key={s.id} to="/" aria-current={active ? 'page' : undefined} className={cls}>
               {s.name}
-              {active && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" aria-hidden="true" />}
+              {mark}
             </Link>
+          ) : (
+            <button key={s.id} onClick={() => switchSubject(s.id)} className={cls}>
+              {s.name}
+            </button>
           )
         })}
       </nav>
@@ -311,7 +313,7 @@ function SidebarNav() {
       isActive ? 'bg-accent font-medium text-black' : 'sweep text-fg-2 hover:text-fg',
     )
   return (
-    <nav className="flex h-full flex-col overflow-y-auto px-4 pt-6 pb-4" aria-label="English">
+    <nav className="flex h-full flex-col overflow-y-auto px-4 pt-6 pb-4" aria-label={subject.name}>
       <VexAccount />
       <div className="mb-2 border-b border-line px-2.5 pb-2.5 font-pixel text-[11px] tracking-[0.08em] text-fg uppercase">{subject.name}</div>
       <ul className="space-y-0.5">

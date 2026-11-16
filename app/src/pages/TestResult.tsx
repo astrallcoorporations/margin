@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Check, CircleAlert, RotateCcw, Sparkles, X } from 'lucide-react'
-import { getTest, testQuestions } from '@/data/english/tests'
+import { getTest, testQuestions } from '@/data/active-tests'
 import { ensureDictionary, gradeAttempt, type QuestionResult } from '@/lib/grading'
 import { useStore } from '@/lib/storage'
 import { buildMarkingPrompt } from '@/lib/prompts'

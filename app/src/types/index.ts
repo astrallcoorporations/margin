@@ -10,8 +10,11 @@ export type ResourceType =
   | 'writing'
   | 'speaking'
   | 'exam'
+  | 'concept'
+  | 'worksheet'
+  | 'revision'
 
-export type CategoryId = 'literature' | 'language' | 'grammar'
+export type CategoryId = 'literature' | 'language' | 'grammar' | 'concepts' | 'practice' | 'revision'
 
 export interface Category {
   id: CategoryId
@@ -81,6 +84,10 @@ export interface Subject {
   resources: Resource[]
   tasks: Task[]
   flashcards: Flashcard[]
+  /** Categories shown on the Learn page; English's are the default */
+  categories?: Category[]
+  /** Mock papers and worksheets */
+  tests?: import('./tests').MockTest[]
 }
 
 export type TaskType =
@@ -92,6 +99,7 @@ export type TaskType =
   | 'vocabulary'
   | 'short'
   | 'long'
+  | 'numerical'
 
 export type Difficulty = 'easy' | 'medium' | 'hard'
 

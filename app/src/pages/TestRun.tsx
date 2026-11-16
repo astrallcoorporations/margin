@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Check, Clock, RotateCcw } from 'lucide-react'
-import { getTest, testMarks, testQuestions } from '@/data/english/tests'
+import { getTest, testMarks, testQuestions } from '@/data/active-tests'
 import { actions, getState, useStore } from '@/lib/storage'
 import { countWords, ensureDictionary, gradeAttempt } from '@/lib/grading'
 import { cn } from '@/lib/utils'

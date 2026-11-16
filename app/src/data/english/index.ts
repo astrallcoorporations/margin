@@ -2,6 +2,7 @@ import type { Subject } from '@/types'
 import { resources, steps } from './resources'
 import { tasks } from './tasks'
 import { flashcards } from './flashcards'
+import { tests } from './tests'
 
 export const english: Subject = {
   id: 'english',
@@ -75,4 +76,5 @@ export const english: Subject = {
   resources,
   tasks,
   flashcards,
+  tests,
 }

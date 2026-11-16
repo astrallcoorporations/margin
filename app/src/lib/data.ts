@@ -1,8 +1,8 @@
-import { categories, subjects } from '@/data/catalog'
+import { activeSubject, categories } from '@/data/catalog'
 import type { CategoryId, Difficulty, Resource, ResourceType, Step, TaskType } from '@/types'
 
-/** The active subject. Single-subject for now; the rest of the app reads everything through here. */
-export const subject = subjects[0]
+/** The active subject (chosen with the subject tabs). The rest of the app reads everything through here. */
+export const subject = activeSubject
 
 const resourceById = new Map(subject.resources.map((r) => [r.id, r]))
 const stepById = new Map(subject.steps.map((s) => [s.id, s]))
@@ -38,6 +38,9 @@ export const TYPE_LABEL: Record<ResourceType, string> = {
   writing: 'Writing',
   speaking: 'Speaking',
   exam: 'Exam skills',
+  concept: 'Concept',
+  worksheet: 'Worksheet',
+  revision: 'Revision',
 }
 
 export const TASK_TYPE_LABEL: Record<TaskType, string> = {
@@ -49,6 +52,7 @@ export const TASK_TYPE_LABEL: Record<TaskType, string> = {
   vocabulary: 'Vocabulary',
   short: 'Short answer',
   long: 'Long answer',
+  numerical: 'Problem solving',
 }
 
 export const DIFFICULTY_LABEL: Record<Difficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }

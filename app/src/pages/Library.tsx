@@ -15,6 +15,9 @@ const PLURAL: Record<ResourceType, string> = {
   writing: 'Writing',
   speaking: 'Speaking',
   exam: 'Exam skills',
+  concept: 'Concepts',
+  worksheet: 'Worksheets',
+  revision: 'Revision',
 }
 
 export default function Library() {

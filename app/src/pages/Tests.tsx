@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight, Clock, FileCheck2, History } from 'lucide-react'
-import { tests, testMarks, testQuestions, getTest } from '@/data/english/tests'
+import { tests, testMarks, testQuestions, getTest } from '@/data/active-tests'
 import { useStore } from '@/lib/storage'
 import { timeAgo } from '@/lib/utils'
 import { Page, PageHeader } from '@/components/blocks'

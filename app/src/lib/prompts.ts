@@ -103,7 +103,7 @@ export function buildReviewPrompt(task: Task, answer: string, notes?: string | n
   const trimmed = answer.trim()
   const checks = ['Did I answer the actual question (the command word)?', 'Is my evidence relevant and specific?', 'Is my explanation clear?', 'Any factual errors about the text?', 'Any grammar, spelling or punctuation errors?', 'Important ideas I missed?', ...(TYPE_RUBRIC[task.type] ?? []), ...(task.llmReviewPrompt ?? [])]
   return [
-    'Can you mark this practice answer like a strict-but-kind English teacher? I want to improve it myself — please don’t rewrite it for me.',
+    'Can you mark this practice answer like a strict-but-kind ' + subject.name + ' teacher? I want to improve it myself — please don’t rewrite it for me.',
     '',
     contextBlock(),
     '',
@@ -350,7 +350,7 @@ export function buildRevisePrompt(opts: ReviseOptions, state: State, cards: Flas
     if (opts.scope === 'sa1' && g.group === 'Grammar') syllabus.push('- Punctuation (no notes in my folder — use standard Class 8 rules)')
   }
   return [
-    'I’d like you to be my English revision tutor for this session. Everything about my course is below — read all of it, then we’ll start.',
+    'I’d like you to be my ' + subject.name + ' revision tutor for this session. Everything about my course is below — read all of it, then we’ll start.',
     '',
     contextBlock(),
     '',
@@ -398,7 +398,7 @@ export function buildMarkingPrompt(test: MockTest, answers: Record<string, strin
     }
   }
   return [
-    'Can you mark my mock exam paper like my English teacher would? The multiple-choice parts are already marked — please focus on the written answers.',
+    'Can you mark my mock exam paper like my ' + subject.name + ' teacher would? The multiple-choice parts are already marked — please focus on the written answers.',
     '',
     contextBlock(),
     '',
