@@ -309,3 +309,29 @@ export async function fetchFileText(id: string): Promise<{ text: string; readabl
   if (!r.ok) return { text: '', readable: false }
   return r.json()
 }
+
+/* ---------------- Announcements: the school's mail, read and sent through the person's own Gmail ---------------- */
+export type MailThread = { id: string; subject: string; from: string; date: number; snippet: string; unread: boolean; count: number }
+export type MailMessage = { id: string; from: string; to: string; cc: string; subject: string; date: number; messageId: string; references: string; body: string; attachments: string[] }
+export type MailList = { configured: boolean; connected: boolean; threads: MailThread[]; next: string; domain: string }
+export const connectMailUrl = (back: string = here()) => `${VEX_URL}/auth/google?service=mail&return=${encodeURIComponent(back)}`
+
+export async function mailList(box: 'school' | 'all', q = '', page = ''): Promise<MailList> {
+  const r = await call(`/api/mail/list?box=${box}${q ? `&q=${encodeURIComponent(q)}` : ''}${page ? `&page=${encodeURIComponent(page)}` : ''}`)
+  if (r.status === 401) throw new VexError('Sign in to see your messages.', 'signin')
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok) throw new VexError(j.error || `Mail didn’t answer (${r.status}).`, 'server')
+  return { configured: !!j.configured, connected: !!j.connected, threads: j.threads ?? [], next: j.next ?? '', domain: j.domain ?? 'ked.edu.in' }
+}
+export async function mailThread(id: string): Promise<MailMessage[]> {
+  const r = await call(`/api/mail/thread?id=${encodeURIComponent(id)}`)
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok) throw new VexError(j.error || `Couldn’t open that message (${r.status}).`, 'server')
+  return j.messages ?? []
+}
+export async function mailSend(p: { to: string; cc?: string; subject: string; body: string; threadId?: string; inReplyTo?: string; references?: string }): Promise<{ threadId: string }> {
+  const r = await call('/api/mail/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok) throw new VexError(j.error || `Couldn’t send (${r.status}).`, 'server', typeof j.wait === 'number' ? j.wait : 0)
+  return { threadId: j.threadId ?? '' }
+}

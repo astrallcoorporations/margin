@@ -105,12 +105,15 @@ export function VexProvider({ children }: { children: ReactNode }) {
     const q = new URLSearchParams(window.location.search)
     const why = q.get('signin')
     const cls = q.get('classroom')
-    if (why || cls) {
+    const mail = q.get('mail')
+    if (why || cls || mail) {
       q.delete('signin')
       q.delete('classroom')
+      q.delete('mail')
       const rest = q.toString()
       window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash)
       if (why && FLAGS[why]) notify(FLAGS[why], 'error')
+      if (mail) notify(mail === 'cancelled' ? 'Mail was not connected.' : 'Google didn’t finish connecting mail.', 'error')
       if (cls) notify(cls === 'failed' ? 'Google didn’t finish connecting Classroom.' : cls === 'cancelled' ? 'Classroom was not connected.' : 'Classroom isn’t set up on Vex yet.', 'error')
     }
     refresh()

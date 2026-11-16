@@ -18,6 +18,7 @@ import Settings from './pages/Settings'
 import Classroom from './pages/Classroom'
 import Subject from './pages/Subject'
 import Logbook from './pages/Logbook'
+import Announcements from './pages/Announcements'
 import Tests from './pages/Tests'
 import TestRun from './pages/TestRun'
 import TestResult from './pages/TestResult'
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
       { path: '/tests', element: <Tests /> },
       { path: '/classroom', element: <Classroom /> },
       { path: '/logbook', element: <Logbook /> },
+      { path: '/announcements', element: <Announcements /> },
       { path: '/classroom/:courseId', element: <Classroom /> },
       { path: '/subjects/:id', element: <Subject /> },
       { path: '/tests/:testId', element: <TestRun /> },
