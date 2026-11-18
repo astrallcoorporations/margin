@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, Copy, ExternalLink, LogIn, LogOut, Paperclip, Plus, RotateCcw, Send, Square, X } from 'lucide-react'
+import { ChevronDown, Copy, ExternalLink, Globe, LogIn, LogOut, Paperclip, Plus, RotateCcw, Send, Square, X } from 'lucide-react'
 import { ATTACH_ACCEPT, MAX_ATTACH, askVex, fetchLibrary, readAttachment, takeAttachedImages, signInUrl, signOut, startSync, vexSession, VexError, VEX_SITE, type Attachment, type LibraryData, type VexCredits, type VexModel, type VexMessage, type VexSession } from '@/lib/vex'
 import { renderMarkdown } from '@/lib/md'
 import { copyText } from '@/lib/clipboard'
@@ -56,6 +56,13 @@ export function VexProvider({ children }: { children: ReactNode }) {
       return ''
     }
   })
+  const [web, setWeb] = useState(() => {
+    try {
+      return localStorage.getItem('vex-web') === '1'
+    } catch {
+      return false
+    }
+  })
   const [attach, setAttach] = useState<Attachment[]>([])
   const [reading, setReading] = useState(false)
   const [coolUntil, setCoolUntil] = useState(0)
@@ -63,6 +70,11 @@ export function VexProvider({ children }: { children: ReactNode }) {
   const filePick = useRef<HTMLInputElement>(null)
   const models = session.state === 'signedin' ? session.models : []
   const picked = models.find((m) => m.id === modelId) ?? models[0]
+  const searcher = models.find((m) => m.web)
+  const hasImages = attach.some((a) => a.kind === 'image' || (a.images?.length ?? 0) > 0)
+  const canSearchWeb = session.state === 'signedin' ? !!session.canSearchWeb : false
+  const webOn = web && canSearchWeb && !hasImages
+  const effective = webOn && picked && !picked.web && searcher && !hasImages ? searcher : picked
   const coolLeft = Math.max(0, Math.ceil((coolUntil - now) / 1000))
   useEffect(() => {
     if (coolUntil <= Date.now()) return
@@ -78,6 +90,17 @@ export function VexProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('vex-model', id)
     } catch {
       /* private mode: the choice just isn't remembered */
+    }
+  }
+  const toggleWeb = () => {
+    const next = !web
+    if (next && hasImages) return notify('Web search cannot be combined with a photo in the same message. Remove the photo first.', 'error')
+    if (next && session.state === 'signedin' && !canSearchWeb) return notify('No web-search model is available on this Groq key.', 'error')
+    setWeb(next)
+    try {
+      localStorage.setItem('vex-web', next ? '1' : '0')
+    } catch {
+      /* private mode */
     }
   }
   const ctl = useRef<AbortController | null>(null)
@@ -172,7 +195,10 @@ export function VexProvider({ children }: { children: ReactNode }) {
           return [{ role: 'user', content: [{ type: 'text', text: m.content }, ...m.images.map((url) => ({ type: 'image_url' as const, image_url: { url } }))] }]
         return [{ role: m.role, content: m.content }]
       })
-      setCoolUntil(Date.now() + Math.max(2, (picked?.cost ?? 1) * 2) * 1000)
+      const lastMsg = history[history.length - 1]
+      const useWeb = web && canSearchWeb && !(lastMsg?.role === 'user' && lastMsg.images?.length)
+      const usedModel = useWeb && picked && !picked.web && searcher ? searcher : picked
+      setCoolUntil(Date.now() + Math.max(2, (usedModel?.cost ?? 1) * 2) * 1000)
       setNow(Date.now())
       try {
         const r = await askVex(
@@ -180,6 +206,7 @@ export function VexProvider({ children }: { children: ReactNode }) {
           { text: (piece) => patchLast((a) => ({ ...a, content: a.content + piece })), meta: (m) => m.model && setModel(m.model) },
           mine.signal,
           picked?.id,
+          useWeb,
         )
         if (r.credits) setCredits(r.credits)
         patchLast((a) => (a.content ? { ...a, charged: r.charged } : { ...a, error: { text: 'No answer came back.', kind: 'server' } }))
@@ -193,7 +220,7 @@ export function VexProvider({ children }: { children: ReactNode }) {
         if (ctl.current === mine) setBusy(false)
       }
     },
-    [refresh, picked],
+    [refresh, picked, web, canSearchWeb, searcher],
   )
 
   const ask = useCallback<Ask>(
@@ -353,9 +380,24 @@ export function VexProvider({ children }: { children: ReactNode }) {
                   </div>
                   <footer className="shrink-0 border-t border-line p-3">
                     {models.length > 0 && picked && (
-                      <div className="mb-2 flex items-center gap-3">
-                        <ModelMenu models={models} picked={picked} credits={credits?.left} disabled={busy} onPick={chooseModel} />
-                        {attach.some((a) => a.kind === 'image' || a.images?.length) && !picked.vision && <span className="truncate text-[11.5px] text-fg-3">Photos switch to the photo model (+1 credit)</span>}
+                      <div className="mb-2 flex flex-wrap items-center gap-3">
+                        <ModelMenu models={models} picked={effective ?? picked} credits={credits?.left} disabled={busy} onPick={chooseModel} />
+                        <button
+                          type="button"
+                          onClick={toggleWeb}
+                          aria-pressed={web}
+                          disabled={busy || (!web && (!canSearchWeb || hasImages))}
+                          title={hasImages ? 'Web search cannot be combined with a photo' : !canSearchWeb ? 'No web-search model is available on this Groq key' : web ? 'Web search on (uses a search model)' : 'Search the web'}
+                          className={cn(
+                            'inline-flex h-8 items-center gap-1.5 border px-2.5 font-mono text-[11.5px] uppercase tracking-[0.04em] transition-colors disabled:opacity-40',
+                            web ? 'border-accent/50 bg-accent/10 text-accent' : 'border-line-2 bg-ink-2 text-fg-3 hover:text-fg',
+                          )}
+                        >
+                          <Globe size={13} /> Web
+                        </button>
+                        {hasImages && !(effective ?? picked).vision && <span className="truncate text-[11.5px] text-fg-3">Photos switch to the photo model (+1 credit)</span>}
+                        {webOn && effective?.web && !picked.web && <span className="truncate text-[11.5px] text-fg-3">Web search uses {effective.name}</span>}
+                        {web && hasImages && <span className="truncate text-[11.5px] text-warn">Web off while a photo is attached</span>}
                       </div>
                     )}
                     {attach.length > 0 && (

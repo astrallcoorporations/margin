@@ -15,7 +15,7 @@ export const VEX_SITE: string = (import.meta.env.VITE_VEX_SITE as string | undef
 
 export type VexPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
 export type VexMessage = { role: 'user' | 'assistant'; content: string | VexPart[] }
-export type VexModel = { id: string; name: string; short?: string; what?: string; cost: number; vision?: boolean }
+export type VexModel = { id: string; name: string; short?: string; what?: string; cost: number; vision?: boolean; web?: boolean }
 export type VexCredits = { left: number; max: number }
 
 export type Attached = { id: string; title: string }
@@ -38,7 +38,7 @@ export type VexSession =
   | { state: 'loading' }
   | { state: 'offline' }
   | { state: 'signedout'; unavailable: boolean }
-  | { state: 'signedin'; email: string; credits: VexCredits; model: string; models: VexModel[]; hasKey: boolean; open: boolean }
+  | { state: 'signedin'; email: string; credits: VexCredits; model: string; models: VexModel[]; hasKey: boolean; canSearchWeb: boolean; open: boolean }
 
 const call = (path: string, init: RequestInit = {}) => fetch(`${VEX_URL}${path}`, { ...init, credentials: 'include' })
 
@@ -56,7 +56,7 @@ export async function vexSession(): Promise<VexSession> {
     }
     if (!r.ok) return { state: 'offline' }
     const j = await r.json()
-    return { state: 'signedin', email: j.email || j.name || '', credits: j.credits, model: j.models?.[0]?.name ?? 'Vex', models: (j.models ?? []) as VexModel[], hasKey: Boolean(j.hasKey), open: Boolean(j.open) }
+    return { state: 'signedin', email: j.email || j.name || '', credits: j.credits, model: j.models?.[0]?.name ?? 'Vex', models: (j.models ?? []) as VexModel[], hasKey: Boolean(j.hasKey), canSearchWeb: Boolean(j.canSearchWeb), open: Boolean(j.open) }
   } catch {
     return { state: 'offline' }
   }
@@ -88,21 +88,22 @@ export class VexError extends Error {
   }
 }
 
-type VexEvent = { start?: boolean; model?: string; sample?: boolean; t?: string; done?: boolean; charged?: number; credits?: VexCredits; error?: string }
+type VexEvent = { start?: boolean; model?: string; sample?: boolean; switched?: boolean; searched?: boolean; t?: string; done?: boolean; charged?: number; credits?: VexCredits; error?: string }
 
 /** Streams one answer. Calls on.text with each piece as it arrives; resolves when the answer is complete. */
 export async function askVex(
   messages: VexMessage[],
-  on: { text: (piece: string) => void; meta?: (m: { model?: string; sample?: boolean }) => void },
+  on: { text: (piece: string) => void; meta?: (m: { model?: string; sample?: boolean; switched?: boolean; searched?: boolean }) => void },
   signal?: AbortSignal,
   model?: string,
+  web?: boolean,
 ): Promise<{ charged: number; credits?: VexCredits }> {
   let res: Response
   try {
-    res = await call('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'plain', model, messages: messages.slice(-12) }), signal })
+    res = await call('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'plain', model, web: !!web, messages: messages.slice(-12) }), signal })
   } catch (e) {
     if (signal?.aborted) throw e
-    throw new VexError('Vex isn’t running. Start it, then try again.', 'offline')
+    throw new VexError('Vex isn�?Tt running. Start it, then try again.', 'offline')
   }
   if (res.status === 401) throw new VexError('Sign in with Google to use Vex.', 'signin')
   if (!res.ok || !res.body) {
@@ -137,7 +138,7 @@ export async function askVex(
       } catch {
         continue
       }
-      if (ev.start) on.meta?.({ model: ev.model, sample: ev.sample })
+      if (ev.start) on.meta?.({ model: ev.model, sample: ev.sample, switched: ev.switched, searched: ev.searched })
       if (ev.t) on.text(ev.t)
       if (ev.error) throw new VexError(ev.error, 'server')
       if (ev.done) result = { charged: ev.charged ?? 0, credits: ev.credits }
