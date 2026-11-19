@@ -1,12 +1,13 @@
 import type { Category, Subject } from '@/types'
 import { english } from './english'
 import { maths } from './maths'
+import { french } from './french'
 
 /**
  * Registry of subjects. To add Mathematics or Science, create src/data/<subject>/
  * with the same shape as ./english and append it here.
  */
-export const subjects: Subject[] = [english, maths]
+export const subjects: Subject[] = [english, maths, french]
 
 const englishCategories: Category[] = [
   {

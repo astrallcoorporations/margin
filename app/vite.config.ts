@@ -14,6 +14,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const ROOTS: Record<string, string> = {
   english: path.resolve(here, '../english'),
   maths: path.resolve(here, '../maths'),
+  french: path.resolve(here, '../french'),
 }
 
 // Fail loudly in CI if the study folder isn't there (e.g. deployed without the repo root).
