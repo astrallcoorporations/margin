@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, Copy, ExternalLink, Globe, LogIn, LogOut, Paperclip, Plus, RotateCcw, Send, Square, X } from 'lucide-react'
+import { ChevronDown, Copy, History, ExternalLink, Globe, LogIn, LogOut, Paperclip, Plus, RotateCcw, Send, Square, X } from 'lucide-react'
+import { deleteChat, loadChats, newChatId, saveChat, type SavedChat } from '@/lib/chats'
 import { ATTACH_ACCEPT, MAX_ATTACH, askVex, fetchLibrary, readAttachment, takeAttachedImages, signInUrl, signOut, startSync, vexSession, VexError, VEX_SITE, type Attachment, type LibraryData, type VexCredits, type VexModel, type VexMessage, type VexSession, type WebSource } from '@/lib/vex'
 import { renderMarkdown } from '@/lib/md'
 import { copyText } from '@/lib/clipboard'
 import { buttonClass } from './ui'
-import { cn } from '@/lib/utils'
+import { cn, timeAgo } from '@/lib/utils'
 import { Button } from './ui'
 import { useToast } from './toast'
 import { VexTrailer } from './VexTrailer'
@@ -64,6 +65,9 @@ export function VexProvider({ children }: { children: ReactNode }) {
     }
   })
   const [attach, setAttach] = useState<Attachment[]>([])
+  const [chatId, setChatId] = useState(() => newChatId())
+  const [histOpen, setHistOpen] = useState(false)
+  const [chats, setChats] = useState<SavedChat[]>(() => loadChats())
   const [reading, setReading] = useState(false)
   const [coolUntil, setCoolUntil] = useState(0)
   const [now, setNow] = useState(() => Date.now())
@@ -71,10 +75,9 @@ export function VexProvider({ children }: { children: ReactNode }) {
   const models = session.state === 'signedin' ? session.models : []
   const picked = models.find((m) => m.id === modelId) ?? models[0]
   const searcher = models.find((m) => m.web)
-  const hasImages = attach.some((a) => a.kind === 'image' || (a.images?.length ?? 0) > 0)
   const canSearchWeb = session.state === 'signedin' ? !!session.canSearchWeb : false
-  const webOn = web && canSearchWeb && !hasImages
-  const effective = webOn && picked && !picked.web && searcher && !hasImages ? searcher : picked
+  const webOn = web && canSearchWeb
+  const effective = webOn && picked && !picked.web && searcher ? searcher : picked
   const coolLeft = Math.max(0, Math.ceil((coolUntil - now) / 1000))
   useEffect(() => {
     if (coolUntil <= Date.now()) return
@@ -94,7 +97,6 @@ export function VexProvider({ children }: { children: ReactNode }) {
   }
   const toggleWeb = () => {
     const next = !web
-    if (next && hasImages) return notify('Web search cannot be combined with a photo in the same message. Remove the photo first.', 'error')
     if (next && session.state === 'signedin' && !canSearchWeb) return notify('No web-search model is available on this Groq key.', 'error')
     setWeb(next)
     try {
@@ -195,15 +197,14 @@ export function VexProvider({ children }: { children: ReactNode }) {
           return [{ role: 'user', content: [{ type: 'text', text: m.content }, ...m.images.map((url) => ({ type: 'image_url' as const, image_url: { url } }))] }]
         return [{ role: m.role, content: m.content }]
       })
-      const lastMsg = history[history.length - 1]
-      const useWeb = web && canSearchWeb && !(lastMsg?.role === 'user' && lastMsg.images?.length)
+      const useWeb = web && canSearchWeb
       const usedModel = useWeb && picked && !picked.web && searcher ? searcher : picked
       setCoolUntil(Date.now() + Math.max(2, (usedModel?.cost ?? 1) * 2) * 1000)
       setNow(Date.now())
       try {
         const r = await askVex(
           wire,
-          { text: (piece) => patchLast((a) => ({ ...a, content: a.content + piece })), search: (q) => patchLast((a) => ({ ...a, searching: q })), sources: (list) => patchLast((a) => ({ ...a, sources: list })), meta: (m) => m.model && setModel(m.model) },
+          { text: (piece) => patchLast((a) => ({ ...a, content: a.content + piece })), imageNotes: (n) => setItems((list) => list.map((m, i) => (i === list.length - 2 && m.role === 'user' ? { ...m, content: `${m.content}\n\n[The student attached ${m.images && m.images.length > 1 ? 'images' : 'an image'}. Everything visible in ${m.images && m.images.length > 1 ? 'them' : 'it'} is written out below. Answer as if you are looking at ${m.images && m.images.length > 1 ? 'them' : 'it'} yourself, and never mention a description, notes or another model:\n${n}\n]` } : m))), search: (q) => patchLast((a) => ({ ...a, searching: q })), sources: (list) => patchLast((a) => ({ ...a, sources: list })), meta: (m) => m.model && setModel(m.model) },
           mine.signal,
           picked?.id,
           useWeb,
@@ -246,7 +247,7 @@ export function VexProvider({ children }: { children: ReactNode }) {
     [notify, run, signedIn, coolUntil],
   )
 
-  const addFiles = async (list: FileList | null) => {
+  const addFiles = async (list: FileList | File[] | null) => {
     const files = Array.from(list ?? [])
     if (!files.length) return
     if (attach.length + files.length > MAX_ATTACH) return notify(`Attach up to ${MAX_ATTACH} files at a time.`, 'error')
@@ -285,6 +286,28 @@ export function VexProvider({ children }: { children: ReactNode }) {
     setItems([])
     setDraft('')
     setAttach([])
+    setChatId(newChatId())
+  }
+  // Every conversation is kept on this device. Pictures are not stored, only what they showed.
+  useEffect(() => {
+    if (busy || items.length === 0 || items[items.length - 1]?.role !== 'assistant' || !items[items.length - 1].content) return
+    const first = items.find((m) => m.role === 'user')
+    const raw = (first && 'label' in first && first.label) || first?.content.split('\n\n[The student attached')[0] || 'Chat'
+    saveChat({ id: chatId, title: raw.replace(/\s+/g, ' ').trim().slice(0, 60), at: Date.now(), items: items.map((m) => (m.role === 'user' ? { ...m, images: undefined } : m)) })
+    setChats(loadChats())
+  }, [items, busy, chatId])
+  const openChat = (c: SavedChat) => {
+    stop()
+    setItems(c.items as Item[])
+    setChatId(c.id)
+    setDraft('')
+    setAttach([])
+    setHistOpen(false)
+  }
+  const removeChat = (id: string) => {
+    deleteChat(id)
+    setChats(loadChats())
+    if (id === chatId) reset()
   }
   const leave = useCallback(async () => {
     stop()
@@ -349,6 +372,35 @@ export function VexProvider({ children }: { children: ReactNode }) {
                 <span className="ml-auto font-mono text-[11.5px] whitespace-nowrap text-fg-2 tabular-nums" aria-live="polite">
                   {signedIn && credits ? `${credits.left} credits left` : ''}
                 </span>
+                {signedIn && (
+                  <div className="relative">
+                    <button onClick={() => { setChats(loadChats()); setHistOpen((o) => !o) }} aria-expanded={histOpen} className="grid size-8 place-items-center rounded-md text-fg-3 hover:bg-ink-3 hover:text-fg" aria-label="Chat history" title="Chat history">
+                      <History size={16} />
+                    </button>
+                    {histOpen && (
+                      <div className="absolute top-full right-0 z-20 mt-1 max-h-[60vh] w-[min(340px,calc(100vw-32px))] overflow-y-auto border border-line-2 bg-ink-1 py-1 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.85)]">
+                        <div className="border-b border-line px-3.5 pt-1.5 pb-2 font-mono text-[10.5px] tracking-[0.08em] text-fg-3 uppercase">On this device</div>
+                        {chats.length === 0 ? (
+                          <p className="px-3.5 py-3 text-[13px] text-fg-3">No chats yet. They are saved here as you go.</p>
+                        ) : (
+                          <ul>
+                            {chats.map((c) => (
+                              <li key={c.id} className={cn('group flex items-center gap-2 px-3.5 py-2 hover:bg-ink-3', c.id === chatId && 'bg-ink-2')}>
+                                <button onClick={() => openChat(c)} className="min-w-0 flex-1 text-left">
+                                  <span className="block truncate text-[13.5px] text-fg">{c.title || 'Chat'}</span>
+                                  <span className="block font-mono text-[11px] text-fg-3">{timeAgo(c.at)}</span>
+                                </button>
+                                <button onClick={() => removeChat(c.id)} className="text-fg-3 opacity-0 transition-opacity group-hover:opacity-100 hover:text-fg focus:opacity-100" aria-label={`Delete ${c.title}`}>
+                                  <X size={14} />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {signedIn && items.length > 0 && (
                   <button onClick={reset} className="grid size-8 place-items-center rounded-md text-fg-3 hover:bg-ink-3 hover:text-fg" aria-label="Clear this conversation" title="Clear">
                     <Plus size={16} />
@@ -378,7 +430,16 @@ export function VexProvider({ children }: { children: ReactNode }) {
                       ),
                     )}
                   </div>
-                  <footer className="shrink-0 border-t border-line p-3">
+                  <footer
+                    className="shrink-0 border-t border-line p-3"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      if (e.dataTransfer.files.length) {
+                        e.preventDefault()
+                        void addFiles(e.dataTransfer.files)
+                      }
+                    }}
+                  >
                     {models.length > 0 && picked && (
                       <div className="mb-2 flex flex-wrap items-center gap-3">
                         <ModelMenu models={models} picked={effective ?? picked} credits={credits?.left} disabled={busy} onPick={chooseModel} />
@@ -386,8 +447,8 @@ export function VexProvider({ children }: { children: ReactNode }) {
                           type="button"
                           onClick={toggleWeb}
                           aria-pressed={web}
-                          disabled={busy || (!web && (!canSearchWeb || hasImages))}
-                          title={hasImages ? 'Web search cannot be combined with a photo' : !canSearchWeb ? 'No web-search model is available on this Groq key' : web ? 'Web search is on: Vex looks things up and shows its sources (+1 credit)' : 'Search the web (+1 credit)'}
+                          disabled={busy || (!web && !canSearchWeb)}
+                          title={!canSearchWeb ? 'No web-search model is available on this Groq key' : web ? 'Web search is on: Vex looks things up and shows its sources (+1 credit)' : 'Search the web (+1 credit)'}
                           className={cn(
                             'inline-flex h-8 items-center gap-1.5 border px-2.5 font-mono text-[11.5px] uppercase tracking-[0.04em] transition-colors disabled:opacity-40',
                             web ? 'border-accent/50 bg-accent/10 text-accent' : 'border-line-2 bg-ink-2 text-fg-3 hover:text-fg',
@@ -395,10 +456,8 @@ export function VexProvider({ children }: { children: ReactNode }) {
                         >
                           <Globe size={13} /> Web
                         </button>
-                        {hasImages && !(effective ?? picked).vision && <span className="truncate text-[11.5px] text-fg-3">Photos switch to the photo model (+1 credit)</span>}
                         {webOn && effective?.tool && <span className="truncate text-[11.5px] text-fg-3">Web: +1 credit</span>}
                         {webOn && effective?.web && !picked.web && <span className="truncate text-[11.5px] text-fg-3">Web search uses {effective.name}</span>}
-                        {web && hasImages && <span className="truncate text-[11.5px] text-warn">Web off while a photo is attached</span>}
                       </div>
                     )}
                     {attach.length > 0 && (
@@ -429,6 +488,13 @@ export function VexProvider({ children }: { children: ReactNode }) {
                         <Paperclip size={16} />
                       </button>
                       <textarea
+                        onPaste={(e) => {
+                          const pics = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'))
+                          if (pics.length) {
+                            e.preventDefault()
+                            void addFiles(pics)
+                          }
+                        }}
                         id="vex-input"
                         ref={input}
                         value={draft}
@@ -662,7 +728,7 @@ function Sent({ item }: { item: Extract<Item, { role: 'user' }> }) {
     return (
       <div>
         <div className="mb-1 font-pixel text-[10.5px] tracking-[0.08em] text-fg-3 uppercase">You</div>
-        <p className="text-[14.5px] leading-relaxed whitespace-pre-wrap text-fg">{item.files?.length ? item.content.split('\n\nAttached file “')[0] : item.content}</p>
+        <p className="text-[14.5px] leading-relaxed whitespace-pre-wrap text-fg">{item.content.split('\n\nAttached file “')[0].split('\n\n[The student attached')[0]}</p>
         {(item.images?.length || item.files?.length) && (
           <div className="mt-2 flex flex-wrap gap-2">
             {item.images?.map((u, i) => (

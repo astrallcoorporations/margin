@@ -89,12 +89,12 @@ export class VexError extends Error {
 }
 
 export type WebSource = { title: string; url: string }
-type VexEvent = { start?: boolean; model?: string; sample?: boolean; switched?: boolean; searched?: boolean; web?: string; q?: string; sources?: WebSource[]; t?: string; done?: boolean; charged?: number; credits?: VexCredits; error?: string }
+type VexEvent = { start?: boolean; model?: string; sample?: boolean; switched?: boolean; searched?: boolean; looking?: boolean; imageNotes?: string; web?: string; q?: string; sources?: WebSource[]; t?: string; done?: boolean; charged?: number; credits?: VexCredits; error?: string }
 
 /** Streams one answer. Calls on.text with each piece as it arrives; resolves when the answer is complete. */
 export async function askVex(
   messages: VexMessage[],
-  on: { text: (piece: string) => void; search?: (query: string) => void; sources?: (list: WebSource[]) => void; meta?: (m: { model?: string; sample?: boolean; switched?: boolean; searched?: boolean }) => void },
+  on: { text: (piece: string) => void; search?: (query: string) => void; imageNotes?: (notes: string) => void; sources?: (list: WebSource[]) => void; meta?: (m: { model?: string; sample?: boolean; switched?: boolean; searched?: boolean }) => void },
   signal?: AbortSignal,
   model?: string,
   web?: boolean,
@@ -142,6 +142,7 @@ export async function askVex(
       if (ev.start) on.meta?.({ model: ev.model, sample: ev.sample, switched: ev.switched, searched: ev.searched })
       if (ev.web === 'search' && ev.q) on.search?.(ev.q)
       if (ev.sources) on.sources?.(ev.sources)
+      if (ev.imageNotes) on.imageNotes?.(ev.imageNotes)
       if (ev.t) on.text(ev.t)
       if (ev.error) throw new VexError(ev.error, 'server')
       if (ev.done) result = { charged: ev.charged ?? 0, credits: ev.credits }
@@ -239,13 +240,13 @@ function shrinkImage(file: File): Promise<string> {
     const url = URL.createObjectURL(file)
     const img = new Image()
     img.onload = () => {
-      const scale = Math.min(1, 1000 / Math.max(img.width, img.height))
+      const scale = Math.min(1, 900 / Math.max(img.width, img.height))
       const c = document.createElement('canvas')
       c.width = Math.max(1, Math.round(img.width * scale))
       c.height = Math.max(1, Math.round(img.height * scale))
       c.getContext('2d')?.drawImage(img, 0, 0, c.width, c.height)
       URL.revokeObjectURL(url)
-      resolve(c.toDataURL('image/jpeg', 0.75))
+      resolve(c.toDataURL('image/jpeg', 0.7))
     }
     img.onerror = () => {
       URL.revokeObjectURL(url)
