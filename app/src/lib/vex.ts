@@ -11,7 +11,7 @@
 /** Where Margin's own requests go. Empty means "this same site", which is the normal setup. */
 export const VEX_URL: string = (import.meta.env.VITE_VEX_URL as string | undefined)?.replace(/\/$/, '') ?? ''
 /** Where Vex's own standalone page lives, for the "Open Vex" links. */
-export const VEX_SITE: string = (import.meta.env.VITE_VEX_SITE as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:3000'
+export const VEX_SITE: string = (import.meta.env.VITE_VEX_SITE as string | undefined)?.replace(/\/$/, '') ?? (import.meta.env.PROD ? 'https://vex2026.vercel.app' : 'http://localhost:3000')
 
 export type VexPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
 export type VexMessage = { role: 'user' | 'assistant'; content: string | VexPart[] }
@@ -339,4 +339,12 @@ export async function mailSend(p: { to: string; cc?: string; subject: string; bo
   const j = await r.json().catch(() => ({}))
   if (!r.ok) throw new VexError(j.error || `Couldn’t send (${r.status}).`, 'server', typeof j.wait === 'number' ? j.wait : 0)
   return { threadId: j.threadId ?? '' }
+}
+
+/** A short code that signs the same student in on Vex's own site, so they do not sign in twice. One use, two minutes. */
+export async function createVexCode(): Promise<{ code: string; expiresIn: number }> {
+  const r = await call('/api/handoff/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok) throw new VexError(j.error || `Couldn’t make a code (${r.status}).`, 'server')
+  return { code: j.code, expiresIn: j.expiresIn ?? 120 }
 }

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createPortal } from 'react-dom'
 import { ChevronDown, Copy, History, ExternalLink, Globe, LogIn, LogOut, Paperclip, Plus, RotateCcw, Send, Square, X } from 'lucide-react'
 import { deleteChat, loadChats, newChatId, saveChat, type SavedChat } from '@/lib/chats'
-import { ATTACH_ACCEPT, MAX_ATTACH, askVex, fetchLibrary, readAttachment, takeAttachedImages, signInUrl, signOut, startSync, vexSession, VexError, VEX_SITE, type Attachment, type LibraryData, type VexCredits, type VexModel, type VexMessage, type VexSession, type WebSource } from '@/lib/vex'
+import { createVexCode, ATTACH_ACCEPT, MAX_ATTACH, askVex, fetchLibrary, readAttachment, takeAttachedImages, signInUrl, signOut, startSync, vexSession, VexError, VEX_SITE, type Attachment, type LibraryData, type VexCredits, type VexModel, type VexMessage, type VexSession, type WebSource } from '@/lib/vex'
 import { renderMarkdown } from '@/lib/md'
 import { copyText } from '@/lib/clipboard'
 import { buttonClass } from './ui'
@@ -653,6 +653,58 @@ export function VexNavButton({ className }: { className?: string }) {
   )
 }
 
+/** "Get Vex code": a one-use code (two minutes) that signs the same student in on Vex's own site. */
+function VexCode() {
+  const notify = useToast()
+  const [code, setCode] = useState('')
+  const [left, setLeft] = useState(0)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    if (left <= 0) return
+    const t = window.setTimeout(() => setLeft((n) => n - 1), 1000)
+    return () => window.clearTimeout(t)
+  }, [left])
+  const make = async () => {
+    setBusy(true)
+    try {
+      const r = await createVexCode()
+      setCode(r.code)
+      setLeft(r.expiresIn)
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'Couldn’t make a code', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+  if (code && left > 0)
+    return (
+      <div className="mt-1 w-full border border-accent/40 bg-ink-2 p-2.5">
+        <div className="font-mono text-[10.5px] tracking-[0.08em] text-fg-3 uppercase">Type this on the Vex site</div>
+        <div className="mt-1 flex items-center gap-2">
+          <span className="font-mono text-[20px] font-semibold tracking-[0.14em] text-fg select-all">{code}</span>
+          <button
+            onClick={async () => notify((await copyText(code)) ? 'Code copied' : 'Couldn’t copy', 'ok')}
+            className="ml-auto grid size-7 place-items-center text-fg-3 hover:text-fg"
+            aria-label="Copy the code"
+          >
+            <Copy size={13} />
+          </button>
+        </div>
+        <div className="mt-1 text-[11.5px] text-fg-3">
+          Works once · {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')} left ·{' '}
+          <a href={VEX_SITE} target="_blank" rel="noreferrer" className="text-accent underline underline-offset-2">
+            open Vex
+          </a>
+        </div>
+      </div>
+    )
+  return (
+    <Button size="sm" variant="secondary" onClick={make} disabled={busy}>
+      {busy ? 'Making…' : 'Get Vex code'}
+    </Button>
+  )
+}
+
 /** Sidebar block: the one place to sign in, see credits, and jump to Vex. */
 export function VexAccount() {
   const { session, leave, refresh } = useVex()
@@ -672,6 +724,7 @@ export function VexAccount() {
             <a href={VEX_SITE} target="_blank" rel="noreferrer" className={buttonClass('secondary', 'sm')}>
               <ExternalLink size={12} /> Open Vex
             </a>
+            <VexCode />
             {!session.open && (
               <Button size="sm" variant="ghost" onClick={leave}>
                 <LogOut size={12} /> Sign out
