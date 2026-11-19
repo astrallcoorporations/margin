@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Copy, ExternalLink, Globe, LogIn, LogOut, Paperclip, Plus, RotateCcw, Send, Square, X } from 'lucide-react'
-import { ATTACH_ACCEPT, MAX_ATTACH, askVex, fetchLibrary, readAttachment, takeAttachedImages, signInUrl, signOut, startSync, vexSession, VexError, VEX_SITE, type Attachment, type LibraryData, type VexCredits, type VexModel, type VexMessage, type VexSession } from '@/lib/vex'
+import { ATTACH_ACCEPT, MAX_ATTACH, askVex, fetchLibrary, readAttachment, takeAttachedImages, signInUrl, signOut, startSync, vexSession, VexError, VEX_SITE, type Attachment, type LibraryData, type VexCredits, type VexModel, type VexMessage, type VexSession, type WebSource } from '@/lib/vex'
 import { renderMarkdown } from '@/lib/md'
 import { copyText } from '@/lib/clipboard'
 import { buttonClass } from './ui'
@@ -12,7 +12,7 @@ import { VexTrailer } from './VexTrailer'
 
 type Item =
   | { role: 'user'; content: string; label?: string; images?: string[]; files?: string[] }
-  | { role: 'assistant'; content: string; error?: { text: string; kind: VexError['kind'] }; charged?: number }
+  | { role: 'assistant'; content: string; error?: { text: string; kind: VexError['kind'] }; charged?: number; searching?: string; sources?: WebSource[] }
 
 type Ask = (getText: () => string | Promise<string>, label: string) => void
 type VexCtx = {
@@ -203,7 +203,7 @@ export function VexProvider({ children }: { children: ReactNode }) {
       try {
         const r = await askVex(
           wire,
-          { text: (piece) => patchLast((a) => ({ ...a, content: a.content + piece })), meta: (m) => m.model && setModel(m.model) },
+          { text: (piece) => patchLast((a) => ({ ...a, content: a.content + piece })), search: (q) => patchLast((a) => ({ ...a, searching: q })), sources: (list) => patchLast((a) => ({ ...a, sources: list })), meta: (m) => m.model && setModel(m.model) },
           mine.signal,
           picked?.id,
           useWeb,
@@ -387,7 +387,7 @@ export function VexProvider({ children }: { children: ReactNode }) {
                           onClick={toggleWeb}
                           aria-pressed={web}
                           disabled={busy || (!web && (!canSearchWeb || hasImages))}
-                          title={hasImages ? 'Web search cannot be combined with a photo' : !canSearchWeb ? 'No web-search model is available on this Groq key' : web ? 'Web search on (uses a search model)' : 'Search the web'}
+                          title={hasImages ? 'Web search cannot be combined with a photo' : !canSearchWeb ? 'No web-search model is available on this Groq key' : web ? 'Web search is on: Vex looks things up and shows its sources (+1 credit)' : 'Search the web (+1 credit)'}
                           className={cn(
                             'inline-flex h-8 items-center gap-1.5 border px-2.5 font-mono text-[11.5px] uppercase tracking-[0.04em] transition-colors disabled:opacity-40',
                             web ? 'border-accent/50 bg-accent/10 text-accent' : 'border-line-2 bg-ink-2 text-fg-3 hover:text-fg',
@@ -396,6 +396,7 @@ export function VexProvider({ children }: { children: ReactNode }) {
                           <Globe size={13} /> Web
                         </button>
                         {hasImages && !(effective ?? picked).vision && <span className="truncate text-[11.5px] text-fg-3">Photos switch to the photo model (+1 credit)</span>}
+                        {webOn && effective?.tool && <span className="truncate text-[11.5px] text-fg-3">Web: +1 credit</span>}
                         {webOn && effective?.web && !picked.web && <span className="truncate text-[11.5px] text-fg-3">Web search uses {effective.name}</span>}
                         {web && hasImages && <span className="truncate text-[11.5px] text-warn">Web off while a photo is attached</span>}
                       </div>
@@ -704,7 +705,23 @@ function Answer({ item, live, onRetry, onCopyPrompt }: { item: Extract<Item, { r
         // renderMarkdown escapes all input before adding tags
         <div className="vex-md" dangerouslySetInnerHTML={{ __html: html }} />
       ) : (
-        live && <p className="text-[13.5px] text-fg-3">Thinking…</p>
+        live && <p className="text-[13.5px] text-fg-3">{item.searching ? `Searching the web: ${item.searching}` : 'Thinking…'}</p>
+      )}
+      {item.sources && item.sources.length > 0 && !live && (
+        <div className="mt-3 border-t border-line pt-2.5">
+          <div className="mb-1.5 font-mono text-[10.5px] tracking-[0.08em] text-fg-3 uppercase">Sources</div>
+          <ol className="space-y-1">
+            {item.sources.map((s, i) => (
+              <li key={s.url} className="flex gap-2 text-[12.5px] leading-snug">
+                <span className="w-4 shrink-0 font-mono text-fg-3">{i + 1}</span>
+                <a href={s.url} target="_blank" rel="noreferrer noopener" className="min-w-0 truncate text-fg-2 underline decoration-line-2 underline-offset-2 hover:text-fg hover:decoration-fg" title={s.url}>
+                  {s.title}
+                </a>
+                <span className="hidden shrink-0 text-fg-3 sm:inline">{(() => { try { return new URL(s.url).hostname.replace(/^www\./, '') } catch { return '' } })()}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
       {item.error && (
         <div className="mt-3 border border-warn/40 bg-warn/[0.06] px-3.5 py-3">

@@ -15,7 +15,7 @@ export const VEX_SITE: string = (import.meta.env.VITE_VEX_SITE as string | undef
 
 export type VexPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
 export type VexMessage = { role: 'user' | 'assistant'; content: string | VexPart[] }
-export type VexModel = { id: string; name: string; short?: string; what?: string; cost: number; vision?: boolean; web?: boolean }
+export type VexModel = { id: string; name: string; short?: string; what?: string; cost: number; vision?: boolean; web?: boolean; tool?: boolean }
 export type VexCredits = { left: number; max: number }
 
 export type Attached = { id: string; title: string }
@@ -88,12 +88,13 @@ export class VexError extends Error {
   }
 }
 
-type VexEvent = { start?: boolean; model?: string; sample?: boolean; switched?: boolean; searched?: boolean; t?: string; done?: boolean; charged?: number; credits?: VexCredits; error?: string }
+export type WebSource = { title: string; url: string }
+type VexEvent = { start?: boolean; model?: string; sample?: boolean; switched?: boolean; searched?: boolean; web?: string; q?: string; sources?: WebSource[]; t?: string; done?: boolean; charged?: number; credits?: VexCredits; error?: string }
 
 /** Streams one answer. Calls on.text with each piece as it arrives; resolves when the answer is complete. */
 export async function askVex(
   messages: VexMessage[],
-  on: { text: (piece: string) => void; meta?: (m: { model?: string; sample?: boolean; switched?: boolean; searched?: boolean }) => void },
+  on: { text: (piece: string) => void; search?: (query: string) => void; sources?: (list: WebSource[]) => void; meta?: (m: { model?: string; sample?: boolean; switched?: boolean; searched?: boolean }) => void },
   signal?: AbortSignal,
   model?: string,
   web?: boolean,
@@ -103,7 +104,7 @@ export async function askVex(
     res = await call('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'plain', model, web: !!web, messages: messages.slice(-12) }), signal })
   } catch (e) {
     if (signal?.aborted) throw e
-    throw new VexError('Vex isn�?Tt running. Start it, then try again.', 'offline')
+    throw new VexError('Vex isn’t running. Start it, then try again.', 'offline')
   }
   if (res.status === 401) throw new VexError('Sign in with Google to use Vex.', 'signin')
   if (!res.ok || !res.body) {
@@ -139,6 +140,8 @@ export async function askVex(
         continue
       }
       if (ev.start) on.meta?.({ model: ev.model, sample: ev.sample, switched: ev.switched, searched: ev.searched })
+      if (ev.web === 'search' && ev.q) on.search?.(ev.q)
+      if (ev.sources) on.sources?.(ev.sources)
       if (ev.t) on.text(ev.t)
       if (ev.error) throw new VexError(ev.error, 'server')
       if (ev.done) result = { charged: ev.charged ?? 0, credits: ev.credits }
